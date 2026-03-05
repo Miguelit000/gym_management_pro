@@ -196,38 +196,89 @@ class Membresia:
         else:
             return f"Acceso Denegado: {nombre_cliente}. Plan vencido hace {abs(dias_restantes)} dias."
         
+class  Transaccion:
+    def __init__(self, id_usuario, tipo, monto, descripcion):
+        self.id_usuario = id_usuario
+        self.tipo = tipo
+        self.monto = monto
+        self.descripcion = descripcion
+        
+    def registrar(self):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO Transaccion (id_usuario, tipo, monto, descripcion) VALUES (?,?,?,?)",
+                (self.id_usuario, self.tipo, self.monto, self.descripcion)
+            )
+            conexion.commit()
+            id_tx = cursor.lastrowid
+            print(f"Transaccion #{id_tx} registrada: {self.tipo} por ${self.monto:,.2f}. (Cajero ID: {self.id_usuario})")
+            return id_tx
+        except Exception as e:
+            print(f"Error al registrar transaccion: {e}")
+        finally:
+            conexion.close()
+            
+    @staticmethod
+    def anular(id_transaccion_original, id_usuario_anula, motivo):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        
+        try:
+            cursor.execute("SELECT monto, descripcion FROM Transaccion WHERE id_transaccion = ?", (id_transaccion_original,))
+            original = cursor.fetchone()
+            
+            if not original:
+                print("Error: La transaccion original no existe.")
+                return
+            
+            monto_original, desc_original = original
+            
+            monto_anulacion = -monto_original
+            desc_anulacion = f"ANULACION de Tx #{id_transaccion_original}: {motivo}"
+            
+            cursor.execute(
+                "INSERT INTO Transaccion (id_usuario, tipo, monto, descripcion) VALUES (?, 'Anulacion', ?,?)",
+                (id_usuario_anula, monto_anulacion, desc_anulacion)
+            )
+            nueva_tx_id = cursor.lastrowid
+            
+            cursor.execute(
+                "INSERT INTO Auditoria (id_usuario, accion, tabla_afectada, registro_id, valor_anterior, valor_nuevo) VALUES (?,?,?,?,?,?)",
+                (id_usuario_anula, "ANULAR_TRANSACCION", "Transaccion", id_transaccion_original, str(monto_original), str(monto_anulacion))
+            )
+            
+            conexion.commit()
+            print(f"¡ALERTA! Transaccion #{id_transaccion_original} fue ANULADA. Se genero la Tx #{nueva_tx_id} por ${monto_anulacion:,.2f}")
+        except Exception as e:
+            conexion.rollback()
+            print(f"Error critico en la anulacion: {e}")
+        finally:
+            conexion.close()
+            
         
                 
         
 if __name__ == "__main__":
-    inicializar_roles()
+    # Suponemos que Miguel (id_usuario = 1) ya está en la base de datos por las pruebas anteriores
     
-    print("\n--- Vendiendo una Membresía a Ana ---")
-    # Ana compra el plan mensual (id_plan=1, dura 30 días). Ana es id_cliente=1.
-    Membresia.crear_nueva(id_cliente=1, id_plan=1, dias_duracion=30)
+    print("\n--- FASE 2: BLINDAJE FINANCIERO ---")
     
-    print("\n--- Verificando Acceso en la Puerta ---")
-    # Simulamos que Ana pasa la tarjeta por el lector hoy
-    estado_ana = Membresia.verificar_estado("987654321")
-    print(estado_ana)
+    print("\n1. Registrando el pago de una mensualidad (Ingreso)")
+    # Miguel cobra $80,000 por la mensualidad de Ana
+    tx_ingreso = Transaccion(id_usuario=1, tipo="Ingreso", monto=80000, descripcion="Pago Mensualidad - Ana Martinez")
+    id_transaccion_cobro = tx_ingreso.registrar()
 
-    # --- SIMULACIÓN DE PERIODO DE GRACIA ---
-    # Vamos a forzar una membresía vieja directamente en la BD para probar el semáforo amarillo
-    print("\n--- Simulando cliente en periodo de gracia (Venció hace 2 días) ---")
-    conexion = conectar_db()
-    cursor = conexion.cursor()
-    # Registramos un cliente de prueba
-    cursor.execute("INSERT OR IGNORE INTO Cliente (documento, nombre) VALUES ('111', 'Pedro Prueba')")
-    id_pedro = cursor.lastrowid if cursor.lastrowid else 2 
-    
-    # Le creamos una membresía que venció hace exactamente 2 días
-    fecha_vieja = (date.today() - timedelta(days=2)).strftime('%Y-%m-%d')
-    cursor.execute("INSERT INTO Membresia (id_cliente, id_plan, fecha_inicio, fecha_fin) VALUES (?, 1, '2026-01-01', ?)", (id_pedro, fecha_vieja))
-    conexion.commit()
-    conexion.close()
+    print("\n2. Registrando un pago de la luz (Gasto)")
+    # Miguel paga los servicios del gimnasio
+    tx_gasto = Transaccion(id_usuario=1, tipo="Gasto", monto=-150000, descripcion="Pago de Energía Eléctrica")
+    tx_gasto.registrar()
 
-    estado_pedro = Membresia.verificar_estado("111")
-    print(estado_pedro)
+    print("\n3. ¡ERROR! Simulando la anulación de un pago...")
+    # Resulta que el pago de Ana fue con un billete falso, Miguel tiene que anularlo.
+    # No usamos DELETE, usamos nuestro sistema seguro:
+    Transaccion.anular(id_transaccion_original=id_transaccion_cobro, id_usuario_anula=1, motivo="Cliente entregó billete falso")
         
    
             
