@@ -1,5 +1,6 @@
 import sqlite3
 import hashlib
+from datetime import datetime, timedelta, date
 
 def conectar_db():
     conexion = sqlite3.connect("gym_pro.db")
@@ -129,30 +130,104 @@ class Cliente:
             print(f"Cliente con documento {documento} no encontrado.")
             return None
         
+class Membresia:
+    def __init__(self, id_cliente, id_plan, fecha_inicio, fecha_fin, id_membresia=None):
+        self.id_membresia = id_membresia
+        self.id_cliente = id_cliente
+        self.id_plan = id_plan
+        self.fecha_inicio = fecha_inicio
+        self.fecha_fin = fecha_fin
+        
+    def registrar(self):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO Membresia (id_cliente, id_plan, fecha_inicio, fecha_fin) VALUES (?,?,?,?)",
+                (self.id_cliente, self.id_plan, str(self.fecha_inicio), str(self.fecha_fin))
+            )
+            conexion.commit()
+            print(f"Membresia registrada: Del {self.fecha_inicio} al {self.fecha_fin}.")
+        except Exception as e:
+            print(f"Error al registrar memebresia: {e}")
+        finally:
+            conexion.close()
+    
+    @staticmethod
+    def crear_nueva(id_cliente, id_plan, dias_duracion):
+        fecha_inicio = date.today()
+        fecha_fin = fecha_inicio + timedelta(days=dias_duracion)
+        
+        nueva_membresia = Membresia(id_cliente, id_plan, fecha_inicio, fecha_fin)
+        nueva_membresia.registrar()
+        return nueva_membresia
+    
+    @staticmethod
+    def verificar_estado(documento_cliente):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        
+        cursor.execute('''
+                SELECT m.fecha_fin, c.nombre
+                FROM Membresia m
+                JOIN Cliente c ON m.id_cliente = c.id_cliente
+                WHERE c.documento = ?
+                ORDER BY m.fecha_fin DESC LIMIT 1
+        ''', (documento_cliente,))
+        
+        resultado = cursor.fetchone()
+        conexion.close()
+        
+        if not resultado:
+            return "Bloqueado: Cliente no tiene membresias registradas."
+        
+        fecha_fin_str, nombre_cliente = resultado
+        
+        fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
+        hoy = date.today()
+        
+        dias_restantes = (fecha_fin - hoy).days
+        
+        if dias_restantes >= 0:
+            return F"Acceso Permitido: {nombre_cliente}. Plan vigente ({dias_restantes} dias restantes)."
+        elif dias_restantes >= 3:
+            dias_vencidos = abs(dias_restantes)
+            return f"Acceso en gracia: {nombre_cliente}. Vencio hace {dias_vencidos} dia(s). Recuerda pagar en recepcion."
+        else:
+            return f"Acceso Denegado: {nombre_cliente}. Plan vencido hace {abs(dias_restantes)} dias."
+        
+        
+                
+        
 if __name__ == "__main__":
     inicializar_roles()
     
-    print("--- Registrando al socio Principal ---")
-    socio_dueño = Usuario(id_rol=1, documento="123456789", nombre="Miguel Gomez", clave="admin123")
-    socio_dueño.registrar()
+    print("\n--- Vendiendo una Membresía a Ana ---")
+    # Ana compra el plan mensual (id_plan=1, dura 30 días). Ana es id_cliente=1.
+    Membresia.crear_nueva(id_cliente=1, id_plan=1, dias_duracion=30)
     
-    print("\n--- Creando Planes del Gimnasio ---")
-    plan_mensual = Plan(nombre="Mensualidad Estandar", dias_duracion=30, precio_base=80000)
-    plan_anual = Plan(nombre="Plan Anual VIP", dias_duracion=365, precio_base=800000)
+    print("\n--- Verificando Acceso en la Puerta ---")
+    # Simulamos que Ana pasa la tarjeta por el lector hoy
+    estado_ana = Membresia.verificar_estado("987654321")
+    print(estado_ana)
+
+    # --- SIMULACIÓN DE PERIODO DE GRACIA ---
+    # Vamos a forzar una membresía vieja directamente en la BD para probar el semáforo amarillo
+    print("\n--- Simulando cliente en periodo de gracia (Venció hace 2 días) ---")
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    # Registramos un cliente de prueba
+    cursor.execute("INSERT OR IGNORE INTO Cliente (documento, nombre) VALUES ('111', 'Pedro Prueba')")
+    id_pedro = cursor.lastrowid if cursor.lastrowid else 2 
     
-    plan_mensual.registrar()
-    plan_anual.registrar()
-    
-    print("\n--- Registrando Clientes ---")
-    cliente_uno = Cliente(documento="987654321", nombre="Ana Martinez", telefono="3001234567", email="ana@gmail.com")
-    cliente_uno.registrar()
-    
-    cliente_duplicado = Cliente(documento="987654321", nombre="Ana Falsa", telefono="000", email="fake")
-    cliente_duplicado.registrar()
-    
-    datos_ana = Cliente.buscar_por_documento("987654321")
-    if datos_ana:
-        print(f"Datos encontrados: {datos_ana}")
+    # Le creamos una membresía que venció hace exactamente 2 días
+    fecha_vieja = (date.today() - timedelta(days=2)).strftime('%Y-%m-%d')
+    cursor.execute("INSERT INTO Membresia (id_cliente, id_plan, fecha_inicio, fecha_fin) VALUES (?, 1, '2026-01-01', ?)", (id_pedro, fecha_vieja))
+    conexion.commit()
+    conexion.close()
+
+    estado_pedro = Membresia.verificar_estado("111")
+    print(estado_pedro)
         
    
             
