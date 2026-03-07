@@ -409,7 +409,7 @@ class Dashboard:
             print("\n --- REPORTE FINANCIERO ---")
             print("="*50)
             print(f"Total Ingresos:    ${total_ingresos:,.2f}")
-            print(f"otal Gastos:      ${total_gastos:,.2f}")
+            print(f"Total Gastos:      ${total_gastos:,.2f}")
             print(f"Total Anulaciones: ${total_anulaciones:,.2f}")
             print("-" * 50)
             print(f"UTILIDAD NETA:     ${utilidad_neta:,.2f}")
@@ -452,28 +452,3 @@ class Dashboard:
         finally: 
             conexion.close()  
             
-            
-            
-            
-            
-# --- 10. ZONA DE PRUEBAS (DASHBOARD FINAL) ---
-if __name__ == "__main__":
-    print("\n--- FASE 5: DASHBOARD Y CIERRE DE CAJA ---")
-    
-    # 1. Generamos el reporte financiero
-    # Esto sumará la mensualidad de Ana, las aguas, la proteína, y restará la luz y la anulación que hicimos.
-    Dashboard.generar_reporte_financiero()
-    
-    # 2. Revisamos el log de seguridad
-    # Aquí debe aparecer reflejada la anulación del billete falso que simulaste en la Fase 2.
-    Dashboard.ver_auditoria_reciente()
-            
-  
-            
-            
-            
-                
-            
-        
-                
-        
