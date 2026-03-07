@@ -308,29 +308,96 @@ class Asistencia:
         finally:
             conexion.close()
             
+class Producto:
+    def __init__(self, codigo, nombre, precio_venta, stock, id_producto=None):
+        self.id_producto = id_producto
+        self.codigo = codigo
+        self.nombre = nombre
+        self.precio_venta = precio_venta
+        self.stock = stock
+        
+    def registrar(self):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute(
+                "INSERT INTO Producto (codigo, nombre, precio_venta, stock) VALUES (?,?,?,?)",
+                (self.codigo, self.nombre, self.precio_venta, self.stock)
+            )
+            conexion.commit()
+            print(f"Producto registrado: {self.nombre} (Stock inicial: {self.stock})")
+        except sqlite3.IntegrityError:
+            print(f"Error: El codigo de producto '{self.codigo}' ya existe.")
+        finally:
+            conexion.close()
+            
+    @staticmethod
+    def vender(codigo_producto, cantidad, id_usuario_vendedor):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        
+        try:
+            cursor.execute("SELECT id_producto, nombre, precio_venta, stock FROM Producto WHERE codigo = ?", (codigo_producto,))
+            producto = cursor.fetchone()
+            
+            if not producto:
+                print(f"Error: Producto con codigo '{codigo_producto}' no encontrado.")
+                return
+            
+            id_prod, nombre, precio, stock_actual = producto
+            
+            if stock_actual < cantidad:
+                print(f"Alerta de Inventario: No hay suficientes stock de '{nombre}'. Disponible: {stock_actual}.")
+                return
+            
+            total_venta = precio * cantidad
+            nuevo_stock = stock_actual - cantidad
+            
+            cursor.execute("UPDATE Producto SET stock = ? WHERE id_producto = ?", (nuevo_stock, id_prod))
+            
+            descripcion_venta = f"Venta POS: {cantidad}x {nombre}"
+            
+            cursor.execute(
+                "INSERT INTO Transaccion (id_usuario, tipo, monto, descripcion) VALUES (?, 'Ingreso', ?,?)",
+                (id_usuario_vendedor, total_venta, descripcion_venta)
+            )
+            
+            conexion.commit()
+            print(f"Venta exitosa: {cantidad}x {nombre}. Total: ${total_venta:,.2f}. (Stock restante: {nuevo_stock})")
+        
+        except Exception as e:
+            conexion.rollback()
+            print(f"Error critico en la venta: {e}")
+        finally:
+            conexion.close()
+            
+            
+            
+                
+            
         
                 
         
-# --- 8. ZONA DE PRUEBAS (SIMULADOR DE RECEPCIÓN) ---
+## --- 9. ZONA DE PRUEBAS (SIMULADOR DE TIENDA) ---
 if __name__ == "__main__":
-    print("\n" + "*"*50)
-    print(" 🏋️‍♂️ SISTEMA DE CONTROL DE ACCESO INICIADO 🏋️‍♂️")
-    print("*"*50)
-    print("Instrucciones: Pasa la tarjeta (Escribe el número de documento).")
-    print("Escribe 'salir' para apagar el sistema de la puerta.")
-    print("*"*50 + "\n")
+    print("\n--- FASE 4: INVENTARIO Y PUNTO DE VENTA ---")
+    
+    # 1. Surtimos el inventario (Llega el pedido del proveedor)
+    print("\n📦 Registrando productos en el sistema...")
+    agua = Producto(codigo="A001", nombre="Botella de Agua 600ml", precio_venta=3000, stock=50)
+    proteina = Producto(codigo="P001", nombre="Proteína Whey Scoop", precio_venta=8000, stock=20)
+    
+    agua.registrar()
+    proteina.registrar()
 
-    # Bucle infinito: Simulando que el lector de tarjetas está encendido
-    while True:
-        # El input() simula el lector de tarjetas o el teclado
-        lectura = input("Esperando tarjeta o documento...: ")
-        
-        if lectura.lower() == 'salir':
-            print("Apagando sistema de acceso...")
-            break
-            
-        if lectura.strip() == "":
-            continue
-            
-        # Ejecutamos la lógica de la puerta
-        Asistencia.registrar_entrada(lectura)
+    # 2. Simulamos ventas en recepción
+    print("\n🛒 Simulando ventas...")
+    # Miguel (id_usuario=1) vende 2 botellas de agua
+    Producto.vender(codigo_producto="A001", cantidad=2, id_usuario_vendedor=1)
+    
+    # Miguel vende 1 scoop de proteína
+    Producto.vender(codigo_producto="P001", cantidad=1, id_usuario_vendedor=1)
+    
+    # 3. Forzamos un error de stock para probar la seguridad
+    print("\n⚠️ Intentando vender más de lo que hay...")
+    Producto.vender(codigo_producto="P001", cantidad=25, id_usuario_vendedor=1)
