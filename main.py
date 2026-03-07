@@ -371,33 +371,109 @@ class Producto:
         finally:
             conexion.close()
             
-            
-            
-                
-            
+class Dashboard:
+    @staticmethod
+    def generar_reporte_financiero():
+        conexion = conectar_db()
+        cursor = conexion.cursor()
         
-                
+        # Declaramos las variables desde el inicio para evitar warnings
+        total_ingresos = 0.0
+        total_gastos = 0.0
+        total_anulaciones = 0.0
+        utilidad_neta = 0.0
         
-## --- 9. ZONA DE PRUEBAS (SIMULADOR DE TIENDA) ---
+        try: 
+            # 1. Ingresos
+            cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Ingreso'")
+            fila_ingresos = cursor.fetchone()
+            # Corregido: Usamos el mismo nombre de la variable
+            if fila_ingresos: total_ingresos = fila_ingresos[0]
+            
+            # 2. Gastos
+            cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Gasto'")
+            fila_gastos = cursor.fetchone()
+            # Corregido: Quitamos el "_" y usamos fila_gastos
+            if fila_gastos: total_gastos = fila_gastos[0]
+            
+            # 3. Anulaciones
+            cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Anulacion'")
+            fila_anulaciones = cursor.fetchone()
+            # Corregido: Usamos fila_anulaciones
+            if fila_anulaciones: total_anulaciones = fila_anulaciones[0]
+            
+            # Calculamos la utilidad
+            utilidad_neta = total_ingresos + total_gastos + total_anulaciones
+            
+            print("\n" + "="*50)
+            print("\n --- REPORTE FINANCIERO ---")
+            print("="*50)
+            print(f"Total Ingresos:    ${total_ingresos:,.2f}")
+            print(f"otal Gastos:      ${total_gastos:,.2f}")
+            print(f"Total Anulaciones: ${total_anulaciones:,.2f}")
+            print("-" * 50)
+            print(f"UTILIDAD NETA:     ${utilidad_neta:,.2f}")
+            print("="*50 + "\n")
+            
+        except Exception as e:
+            print(f"Error al generar el reporte: {e}")
+            
+        finally:
+            conexion.close()
+            
+    @staticmethod
+    def ver_auditoria_reciente(limite=5):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        
+        try:
+            cursor.execute('''
+                    SELECT a.fecha, u.nombre, a.accion, a.tabla_afectada
+                    FROM Auditoria a
+                    JOIN Usuario u ON a.id_usuario = u.id_usuario
+                    ORDER BY a.fecha DESC LIMIT ?
+                ''', (limite,))
+            
+            registros = cursor.fetchall()
+            
+            print("\n" + "="*50)
+            print("\n --- REGISTRO DE AUDITORÍA DE SEGURIDAD ---")
+            print("="*50)
+            if not registros:
+                print("No hay eventos de seguridad registrados.")
+            else:
+                for reg in registros:
+                    fecha, usuario, accion, tabla = reg
+                    print(f"[{fecha[:16]}] {usuario} -> ejecuto {accion} en la tabla {tabla}")
+            print("="*50 + "\n")
+            
+        except Exception as e:
+            print(f"Error al consultar auditoria: {e}")
+        finally: 
+            conexion.close()  
+            
+            
+            
+            
+            
+# --- 10. ZONA DE PRUEBAS (DASHBOARD FINAL) ---
 if __name__ == "__main__":
-    print("\n--- FASE 4: INVENTARIO Y PUNTO DE VENTA ---")
+    print("\n--- FASE 5: DASHBOARD Y CIERRE DE CAJA ---")
     
-    # 1. Surtimos el inventario (Llega el pedido del proveedor)
-    print("\n📦 Registrando productos en el sistema...")
-    agua = Producto(codigo="A001", nombre="Botella de Agua 600ml", precio_venta=3000, stock=50)
-    proteina = Producto(codigo="P001", nombre="Proteína Whey Scoop", precio_venta=8000, stock=20)
+    # 1. Generamos el reporte financiero
+    # Esto sumará la mensualidad de Ana, las aguas, la proteína, y restará la luz y la anulación que hicimos.
+    Dashboard.generar_reporte_financiero()
     
-    agua.registrar()
-    proteina.registrar()
-
-    # 2. Simulamos ventas en recepción
-    print("\n🛒 Simulando ventas...")
-    # Miguel (id_usuario=1) vende 2 botellas de agua
-    Producto.vender(codigo_producto="A001", cantidad=2, id_usuario_vendedor=1)
-    
-    # Miguel vende 1 scoop de proteína
-    Producto.vender(codigo_producto="P001", cantidad=1, id_usuario_vendedor=1)
-    
-    # 3. Forzamos un error de stock para probar la seguridad
-    print("\n⚠️ Intentando vender más de lo que hay...")
-    Producto.vender(codigo_producto="P001", cantidad=25, id_usuario_vendedor=1)
+    # 2. Revisamos el log de seguridad
+    # Aquí debe aparecer reflejada la anulación del billete falso que simulaste en la Fase 2.
+    Dashboard.ver_auditoria_reciente()
+            
+  
+            
+            
+            
+                
+            
+        
+                
+        
