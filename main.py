@@ -257,28 +257,80 @@ class  Transaccion:
         finally:
             conexion.close()
             
+class Asistencia:
+    @staticmethod
+    def registrar_entrada(documento):
+        
+        cliente = Cliente.buscar_por_documento(documento)
+        
+        if not cliente:
+            print("\n" + "="*50)
+            print("ALERTA: Tarjeta o documento no reconocido")
+            print("="*50 + "\n")
+            return
+        
+        id_cliente = cliente[0]
+        
+        estado_mensaje = Membresia.verificar_estado(documento)
+        
+        estado_bd = "Denegado"
+        if "🟢" in estado_mensaje:
+            estado_bd = "Permitido"
+        elif "🟡" in estado_mensaje:
+            estado_bd = "Gracia"
+            
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        cursor.execute('''
+                CREATE TABLE IF NOT EXISTS Asistencia (
+                    id_asistencia INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_cliente INTEGER,
+                    fecha_hora DATETIME CURRENT_TIMESTAMP,
+                    estado_acceso TEXT,
+                    FOREIGN KEY (id_cliente) REFERENCES Cliente(id_cliente)
+                    )
+                ''')
+            
+        try:
+            cursor.execute(
+                "INSERT INTO Asistencia (id_cliente, estado_acceso) VALUES (?,?)",
+                (id_cliente, estado_bd)
+            )
+            
+            conexion.commit()
+            
+            print("\n" + "="*50)
+            print(estado_mensaje)
+            print("="*50 + "\n")
+            
+        except Exception as e:
+            print(f"Error al guardar el registro de asistencia: {e}")
+        finally:
+            conexion.close()
+            
         
                 
         
+# --- 8. ZONA DE PRUEBAS (SIMULADOR DE RECEPCIÓN) ---
 if __name__ == "__main__":
-    # Suponemos que Miguel (id_usuario = 1) ya está en la base de datos por las pruebas anteriores
-    
-    print("\n--- FASE 2: BLINDAJE FINANCIERO ---")
-    
-    print("\n1. Registrando el pago de una mensualidad (Ingreso)")
-    # Miguel cobra $80,000 por la mensualidad de Ana
-    tx_ingreso = Transaccion(id_usuario=1, tipo="Ingreso", monto=80000, descripcion="Pago Mensualidad - Ana Martinez")
-    id_transaccion_cobro = tx_ingreso.registrar()
+    print("\n" + "*"*50)
+    print(" 🏋️‍♂️ SISTEMA DE CONTROL DE ACCESO INICIADO 🏋️‍♂️")
+    print("*"*50)
+    print("Instrucciones: Pasa la tarjeta (Escribe el número de documento).")
+    print("Escribe 'salir' para apagar el sistema de la puerta.")
+    print("*"*50 + "\n")
 
-    print("\n2. Registrando un pago de la luz (Gasto)")
-    # Miguel paga los servicios del gimnasio
-    tx_gasto = Transaccion(id_usuario=1, tipo="Gasto", monto=-150000, descripcion="Pago de Energía Eléctrica")
-    tx_gasto.registrar()
-
-    print("\n3. ¡ERROR! Simulando la anulación de un pago...")
-    # Resulta que el pago de Ana fue con un billete falso, Miguel tiene que anularlo.
-    # No usamos DELETE, usamos nuestro sistema seguro:
-    Transaccion.anular(id_transaccion_original=id_transaccion_cobro, id_usuario_anula=1, motivo="Cliente entregó billete falso")
+    # Bucle infinito: Simulando que el lector de tarjetas está encendido
+    while True:
+        # El input() simula el lector de tarjetas o el teclado
+        lectura = input("Esperando tarjeta o documento...: ")
         
-   
+        if lectura.lower() == 'salir':
+            print("Apagando sistema de acceso...")
+            break
             
+        if lectura.strip() == "":
+            continue
+            
+        # Ejecutamos la lógica de la puerta
+        Asistencia.registrar_entrada(lectura)
