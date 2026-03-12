@@ -42,17 +42,22 @@ class VentanaLogin(ctk.CTk):
 
         if usuario_valido:
             self.destroy() 
-            
-            nombre_usuario = usuario_valido[1]
-            dashboard = VentanaDashboard(nombre_usuario)
+            # Desempaquetamos los 3 datos exactos
+            id_usuario, id_rol, nombre = usuario_valido
+            dashboard = VentanaDashboard(id_usuario, id_rol, nombre)
             dashboard.mainloop()
         else:
             messagebox.showerror("Error de Acceso", "Documento o contraseña incorrectos.")
             
             
 class VentanaDashboard(ctk.CTk):
-    def __init__(self, nombre_usuario):
+    def __init__(self, id_usuario, id_rol, nombre_usuario):
         super().__init__()
+        
+        # Guardamos los datos del usuario activo para usarlos en toda la ventana
+        self.id_usuario = id_usuario
+        self.id_rol = id_rol
+        self.nombre_usuario = nombre_usuario
 
         self.title("Gym Management Pro - Panel Principal")
         self.geometry("900x600")
@@ -63,7 +68,7 @@ class VentanaDashboard(ctk.CTk):
         # --- MENÚ LATERAL (SIDEBAR) ---
         self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(9, weight=1) # Empujamos el nombre de usuario más abajo
+        self.sidebar_frame.grid_rowconfigure(10, weight=1) 
 
         self.logo_img_label = ctk.CTkLabel(self.sidebar_frame, text="")
         self.logo_img_label.grid(row=0, column=0, padx=20, pady=(20, 0))
@@ -71,43 +76,41 @@ class VentanaDashboard(ctk.CTk):
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="Gym Pro", font=("Roboto", 24, "bold"))
         self.logo_label.grid(row=1, column=0, padx=20, pady=(5, 20))
 
-        # 1. Punto de Venta (Conectado a su pantalla)
+        # Botones PÚBLICOS (Los ven tanto Admins como Recepcionistas)
         self.btn_pos = ctk.CTkButton(self.sidebar_frame, text="Punto de Venta", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_pos)
         self.btn_pos.grid(row=2, column=0, padx=20, pady=10)
 
-        # 2. Control de Puerta (AQUÍ LE AGREGAMOS EL COMMAND)
         self.btn_puerta = ctk.CTkButton(self.sidebar_frame, text="Control de Puerta", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_puerta)
         self.btn_puerta.grid(row=3, column=0, padx=20, pady=10)
 
-        # 3. Reportes Financieros (AQUÍ LE AGREGAMOS EL COMMAND)
-        self.btn_reportes = ctk.CTkButton(self.sidebar_frame, text="Reportes Financieros", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_reportes)
-        self.btn_reportes.grid(row=4, column=0, padx=20, pady=10)
-
-        # 4. Gestión de Clientes (AQUÍ LE AGREGAMOS EL COMMAND)
         self.btn_clientes = ctk.CTkButton(self.sidebar_frame, text="Gestión de Clientes", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_clientes)
-        self.btn_clientes.grid(row=5, column=0, padx=20, pady=10)
+        self.btn_clientes.grid(row=4, column=0, padx=20, pady=10)
 
-        # 5. Gestión de Usuarios (NUEVO)
-        self.btn_usuarios = ctk.CTkButton(self.sidebar_frame, text="Gestión de Usuarios", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_usuarios)
-        self.btn_usuarios.grid(row=6, column=0, padx=20, pady=10)
-        
-        # 6. Asignar Membresías (NUEVO)
         self.btn_membresias = ctk.CTkButton(self.sidebar_frame, text="Vender Membresía", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_membresias)
-        self.btn_membresias.grid(row=7, column=0, padx=20, pady=10)
+        self.btn_membresias.grid(row=5, column=0, padx=20, pady=10)
 
-        # 7. Configuración (Asegúrate de cambiar su row a 8 para hacerle espacio)
-        self.btn_config = ctk.CTkButton(self.sidebar_frame, text="Configuración", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_configuracion)
-        self.btn_config.grid(row=8, column=0, padx=20, pady=10)
+        self.btn_inventario = ctk.CTkButton(self.sidebar_frame, text="Inventario", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_inventario)
+        self.btn_inventario.grid(row=6, column=0, padx=20, pady=10)
 
-        # Info del usuario conectado
-        self.lbl_usuario = ctk.CTkLabel(self.sidebar_frame, text=f"👤 Usuario activo:\n{nombre_usuario}")
-        self.lbl_usuario.grid(row=9, column=0, padx=20, pady=20, sticky="s")
+        # Botones PRIVADOS (Solo los ven los Administradores - ID Rol 2)
+        if self.id_rol == 2:
+            self.btn_reportes = ctk.CTkButton(self.sidebar_frame, text="Reportes y Gastos", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_reportes)
+            self.btn_reportes.grid(row=7, column=0, padx=20, pady=10)
 
-        # --- ÁREA PRINCIPAL (MAIN CONTENT) ---
+            self.btn_usuarios = ctk.CTkButton(self.sidebar_frame, text="Gestión de Usuarios", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_usuarios)
+            self.btn_usuarios.grid(row=8, column=0, padx=20, pady=10)
+
+            self.btn_config = ctk.CTkButton(self.sidebar_frame, text="Configuración", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_configuracion)
+            self.btn_config.grid(row=9, column=0, padx=20, pady=10)
+
+        # Info del usuario (Agregamos el ROL visualmente)
+        rol_texto = "Administrador" if self.id_rol == 2 else "Recepcionista"
+        self.lbl_usuario = ctk.CTkLabel(self.sidebar_frame, text=f"👤 {self.nombre_usuario}\n({rol_texto})")
+        self.lbl_usuario.grid(row=10, column=0, padx=20, pady=20, sticky="s")
+
         self.main_frame = ctk.CTkFrame(self, corner_radius=10)
         self.main_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
 
-        self.nombre_usuario = nombre_usuario
         self.mostrar_inicio()
 
     # (Mantén aquí tu función limpiar_main_frame, mostrar_inicio y las de configuración)
@@ -374,6 +377,42 @@ class VentanaDashboard(ctk.CTk):
         btn_refresh = ctk.CTkButton(self.main_frame, text="🔄 Actualizar Datos", command=self.mostrar_reportes)
         btn_refresh.pack(pady=30)
         
+        frame_gasto = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        frame_gasto.pack(pady=10, fill="x", padx=40)
+        
+        ctk.CTkLabel(frame_gasto, text="💸 Registrar Nuevo Gasto", font=("Roboto", 18, "bold")).pack(pady=10)
+        
+        self.gasto_desc = ctk.CTkEntry(frame_gasto, width=350, placeholder_text="Descripción (Ej: Pago de luz, Mantenimiento)")
+        self.gasto_desc.pack(pady=5)
+        
+        self.gasto_monto = ctk.CTkEntry(frame_gasto, width=350, placeholder_text="Monto en dinero (Ej: 50000)")
+        self.gasto_monto.pack(pady=5)
+        
+        btn_gasto = ctk.CTkButton(frame_gasto, text="Registrar Salida de Dinero", fg_color="#7a2424", hover_color="#5c1a1a", command=self.guardar_gasto_gui)
+        btn_gasto.pack(pady=15)
+        
+    def guardar_gasto_gui(self):
+        from main import Dashboard
+        desc = self.gasto_desc.get()
+        monto_str = self.gasto_monto.get()
+
+        if not desc or not monto_str:
+            messagebox.showwarning("Atención", "Ingresa la descripción y el monto del gasto.")
+            return
+
+        try:
+            monto = float(monto_str)
+            # Usamos el id_usuario que ya guardamos en la clase
+            exito, mensaje = Dashboard.registrar_gasto(monto, desc, self.id_usuario)
+            
+            if exito:
+                messagebox.showinfo("Gasto Registrado", mensaje)
+                self.mostrar_reportes() # Recargamos la pantalla para actualizar las gráficas
+            else:
+                messagebox.showerror("Error", mensaje)
+        except ValueError:
+            messagebox.showerror("Error", "El monto debe ser un número válido.")
+        
     def mostrar_clientes(self):
         """Muestra el formulario para inscribir nuevos miembros al gimnasio."""
         self.limpiar_main_frame()
@@ -549,6 +588,109 @@ class VentanaDashboard(ctk.CTk):
             self.entry_doc_membresia.delete(0, 'end')
         else:
             messagebox.showerror("Error", mensaje)
+            
+    # --- FUNCIONES PARA GESTIÓN DE INVENTARIO ---
+    def mostrar_inventario(self):
+        self.limpiar_main_frame()
+        
+        lbl_titulo = ctk.CTkLabel(self.main_frame, text="📦 Gestión de Inventario", font=("Roboto", 24, "bold"))
+        lbl_titulo.pack(pady=(20, 20))
+
+        # Contenedor principal que dividirá la pantalla en dos columnas
+        frame_grid = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        frame_grid.pack(fill="both", expand=True, padx=20)
+        frame_grid.grid_columnconfigure(0, weight=1)
+        frame_grid.grid_columnconfigure(1, weight=1)
+
+        # --- COLUMNA IZQUIERDA: CREAR PRODUCTO ---
+        frame_crear = ctk.CTkFrame(frame_grid, corner_radius=10)
+        frame_crear.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        
+        ctk.CTkLabel(frame_crear, text="➕ Nuevo Producto", font=("Roboto", 18, "bold")).pack(pady=15)
+
+        self.inv_codigo = ctk.CTkEntry(frame_crear, width=200, placeholder_text="Código (Ej: A002)")
+        self.inv_codigo.pack(pady=10)
+        
+        self.inv_nombre = ctk.CTkEntry(frame_crear, width=200, placeholder_text="Nombre del Producto")
+        self.inv_nombre.pack(pady=10)
+        
+        self.inv_precio = ctk.CTkEntry(frame_crear, width=200, placeholder_text="Precio de Venta ($)")
+        self.inv_precio.pack(pady=10)
+        
+        self.inv_stock = ctk.CTkEntry(frame_crear, width=200, placeholder_text="Stock Inicial")
+        self.inv_stock.pack(pady=10)
+
+        ctk.CTkButton(frame_crear, text="Guardar Producto", fg_color="#28527a", command=self.registrar_producto_gui).pack(pady=20)
+
+        # --- COLUMNA DERECHA: ACTUALIZAR STOCK ---
+        frame_actualizar = ctk.CTkFrame(frame_grid, corner_radius=10)
+        frame_actualizar.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        ctk.CTkLabel(frame_actualizar, text="🔄 Ingresar Mercancía", font=("Roboto", 18, "bold")).pack(pady=15)
+        ctk.CTkLabel(frame_actualizar, text="Suma unidades a un producto existente.", font=("Roboto", 12)).pack(pady=5)
+
+        self.upd_codigo = ctk.CTkEntry(frame_actualizar, width=200, placeholder_text="Código del Producto")
+        self.upd_codigo.pack(pady=15)
+        
+        self.upd_cantidad = ctk.CTkEntry(frame_actualizar, width=200, placeholder_text="Cantidad a sumar")
+        self.upd_cantidad.pack(pady=15)
+
+        ctk.CTkButton(frame_actualizar, text="Sumar al Inventario", fg_color="#228B22", hover_color="#006400", command=self.actualizar_stock_gui).pack(pady=20)
+
+    def registrar_producto_gui(self):
+        from main import Producto
+        
+        cod = self.inv_codigo.get()
+        nom = self.inv_nombre.get()
+        pre_str = self.inv_precio.get()
+        stk_str = self.inv_stock.get()
+
+        if not cod or not nom or not pre_str or not stk_str:
+            messagebox.showwarning("Atención", "Llena todos los campos para crear el producto.")
+            return
+
+        try:
+            pre = float(pre_str)
+            stk = int(stk_str)
+            
+            nuevo_prod = Producto(codigo=cod, nombre=nom, precio_venta=pre, stock=stk)
+            exito, mensaje = nuevo_prod.registrar()
+            
+            if exito:
+                messagebox.showinfo("Éxito", mensaje)
+                self.inv_codigo.delete(0, 'end')
+                self.inv_nombre.delete(0, 'end')
+                self.inv_precio.delete(0, 'end')
+                self.inv_stock.delete(0, 'end')
+            else:
+                messagebox.showerror("Error", mensaje)
+        except ValueError:
+            messagebox.showerror("Error de formato", "El precio debe ser un número y el stock un número entero.")
+
+    def actualizar_stock_gui(self):
+        from main import Producto
+        
+        cod = self.upd_codigo.get()
+        cant_str = self.upd_cantidad.get()
+
+        if not cod or not cant_str:
+            messagebox.showwarning("Atención", "Ingresa el código y la cantidad.")
+            return
+
+        try:
+            cant = int(cant_str)
+            exito, mensaje = Producto.agregar_stock(cod, cant)
+            
+            if exito:
+                messagebox.showinfo("Inventario Actualizado", mensaje)
+                self.upd_codigo.delete(0, 'end')
+                self.upd_cantidad.delete(0, 'end')
+            else:
+                messagebox.showerror("Error", mensaje)
+        except ValueError:
+            messagebox.showerror("Error", "La cantidad debe ser un número entero.")
+            
+    
 
 if __name__ == "__main__":
     app = VentanaLogin()

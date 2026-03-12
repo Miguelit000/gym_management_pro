@@ -48,26 +48,17 @@ class Usuario:
             
     @staticmethod
     def autenticar(documento, clave):
-        
+        import hashlib
         clave_hash = hashlib.sha256(clave.encode()).hexdigest()
-        
         conexion = conectar_db()
         cursor = conexion.cursor()
         
-        cursor.execute(
-            "SELECT id_usuario, nombre, id_rol FROM Usuario WHERE documento = ? AND clave_hash = ?",
-            (documento, clave_hash)
-        )
-        
-        resultado = cursor.fetchone()
+        # Traemos explícitamente el id_usuario, id_rol y nombre
+        cursor.execute("SELECT id_usuario, id_rol, nombre FROM Usuario WHERE documento = ? AND clave_hash = ?", (documento, clave_hash))
+        usuario = cursor.fetchone()
         conexion.close()
         
-        if resultado:
-            print(f"Acceso concedido. Bienvenido, {resultado[1]}.")
-            return resultado 
-        else:
-            print("Acceso denegado. Documento o contraseña incorrectos.")
-            return None
+        return usuario # Devolverá (id_usuario, id_rol, nombre) o None
 
 class Plan:
     def __init__(self, nombre, dias_duracion, precio_base, id_plan=None):
@@ -362,6 +353,30 @@ class Producto:
             return False, f"Error crítico en la venta: {e}"
         finally:
             conexion.close()
+            
+    @staticmethod
+    def agregar_stock(codigo_producto, cantidad_nueva):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute("SELECT nombre, stock FROM Producto WHERE codigo = ?", (codigo_producto,))
+            resultado = cursor.fetchone()
+            
+            if not resultado:
+                return False, f"El producto con código '{codigo_producto}' no existe."
+                
+            nombre_prod, stock_actual = resultado
+            nuevo_stock = stock_actual + cantidad_nueva
+            
+            cursor.execute("UPDATE Producto SET stock = ? WHERE codigo = ?", (nuevo_stock, codigo_producto))
+            conexion.commit()
+            
+            return True, f"Stock actualizado.\nProducto: {nombre_prod}\nNuevo total en bodega: {nuevo_stock}"
+            
+        except Exception as e:
+            return False, f"Error al actualizar inventario: {e}"
+        finally:
+            conexion.close()
                   
 class Dashboard:
     @staticmethod
@@ -403,4 +418,21 @@ class Dashboard:
             
         finally:
             conexion.close()
-            
+    
+    @staticmethod
+    def registrar_gasto(monto, descripcion, id_usuario):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            # Guardamos el gasto como un valor negativo para que la suma del reporte cuadre perfecta
+            monto_negativo = -abs(monto)
+            cursor.execute(
+                "INSERT INTO Transaccion (id_usuario, tipo, monto, descripcion) VALUES (?, 'Gasto', ?, ?)",
+                (id_usuario, monto_negativo, descripcion)
+            )
+            conexion.commit()
+            return True, f"Gasto registrado exitosamente: ${abs(monto):,.2f}"
+        except Exception as e:
+            return False, f"Error al registrar el gasto: {e}"
+        finally:
+            conexion.close()
