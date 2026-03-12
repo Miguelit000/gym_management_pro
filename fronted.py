@@ -116,54 +116,118 @@ class VentanaDashboard(ctk.CTk):
     # (Mantén aquí tu función limpiar_main_frame, mostrar_inicio y las de configuración)
 
     # --- NUEVAS FUNCIONES PARA EL PUNTO DE VENTA ---
+    # --- FUNCIONES PARA EL PUNTO DE VENTA ---
+    
     def mostrar_pos(self):
-        """Muestra la interfaz del cajero para vender productos."""
         self.limpiar_main_frame()
         
         lbl_titulo = ctk.CTkLabel(self.main_frame, text="🛒 Punto de Venta (POS)", font=("Roboto", 24, "bold"))
-        lbl_titulo.pack(pady=(40, 20))
+        lbl_titulo.pack(pady=(20, 10))
 
-        # Contenedor para alinear los inputs
+        # --- SECCIÓN 1: FORMULARIO DE VENTA ---
         frame_form = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        frame_form.pack(pady=20)
+        frame_form.pack(pady=10)
 
-        # Input de Código
         self.entry_codigo = ctk.CTkEntry(frame_form, width=200, placeholder_text="Código del Producto")
         self.entry_codigo.grid(row=0, column=0, padx=10, pady=10)
 
-        # Input de Cantidad
         self.entry_cantidad = ctk.CTkEntry(frame_form, width=200, placeholder_text="Cantidad (Ej: 1)")
         self.entry_cantidad.grid(row=0, column=1, padx=10, pady=10)
 
-        # Botón para procesar
-        btn_vender = ctk.CTkButton(self.main_frame, text="💵 Procesar Venta", width=200, fg_color="green", hover_color="darkgreen", command=self.procesar_venta_gui)
-        btn_vender.pack(pady=20)
+        btn_vender = ctk.CTkButton(frame_form, text="💵 Procesar Venta", fg_color="green", hover_color="darkgreen", command=self.procesar_venta_gui)
+        btn_vender.grid(row=0, column=2, padx=10, pady=10)
+
+        # --- SECCIÓN 2: LA TABLA DE PRODUCTOS ---
+        ctk.CTkLabel(self.main_frame, text="📦 Catálogo de Productos Disponibles", font=("Roboto", 16, "bold")).pack(pady=(20, 5))
+        ctk.CTkLabel(self.main_frame, text="*Haz un clic en un producto para pasarlo al cajero*", font=("Roboto", 12, "italic")).pack(pady=(0, 10))
+        
+        # Importamos la herramienta de tablas aquí directo por seguridad
+        from tkinter import ttk 
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Treeview", rowheight=30)
+
+        frame_tabla = ctk.CTkFrame(self.main_frame)
+        frame_tabla.pack(pady=5, fill="both", expand=True, padx=40)
+
+        columnas = ("codigo", "nombre", "precio", "stock")
+        self.tabla_productos = ttk.Treeview(frame_tabla, columns=columnas, show="headings", height=8)
+        
+        self.tabla_productos.heading("codigo", text="Código")
+        self.tabla_productos.heading("nombre", text="Producto")
+        self.tabla_productos.heading("precio", text="Precio de Venta")
+        self.tabla_productos.heading("stock", text="Stock Disp.")
+
+        self.tabla_productos.column("codigo", width=100, anchor="center")
+        self.tabla_productos.column("nombre", width=300, anchor="w")
+        self.tabla_productos.column("precio", width=120, anchor="center")
+        self.tabla_productos.column("stock", width=100, anchor="center")
+
+        scrollbar = ttk.Scrollbar(frame_tabla, orient="vertical", command=self.tabla_productos.yview)
+        self.tabla_productos.configure(yscroll=scrollbar.set)
+        
+        self.tabla_productos.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # Evento de clic simple para seleccionar
+        self.tabla_productos.bind("<<TreeviewSelect>>", self.seleccionar_producto_tabla)
+        
+        # Llenamos la tabla al abrir la ventana
+        self.cargar_tabla_pos()
+
+    def cargar_tabla_pos(self):
+        from main import Producto
+        from tkinter import messagebox
+        
+        # Limpiamos la tabla
+        for item in self.tabla_productos.get_children():
+            self.tabla_productos.delete(item)
+            
+        try:
+            # Llamamos al backend
+            exito, productos = Producto.obtener_todos()
+            
+            if exito:
+                if len(productos) == 0:
+                    print("⚠️ Alerta: La base de datos dice que no hay ningún producto registrado.")
+                for prod in productos:
+                    self.tabla_productos.insert("", "end", values=(prod[0], prod[1], f"${prod[2]:,.2f}", prod[3]))
+            else:
+                messagebox.showerror("Error de Base de Datos", productos)
+                
+        except AttributeError:
+            messagebox.showerror("Error Crítico", "Falta agregar la función 'obtener_todos()' en la clase Producto dentro de main.py")
+
+    def seleccionar_producto_tabla(self, event):
+        seleccion = self.tabla_productos.selection()
+        if seleccion:
+            item = self.tabla_productos.item(seleccion[0])
+            codigo_seleccionado = item['values'][0] 
+            self.entry_codigo.delete(0, 'end')
+            self.entry_codigo.insert(0, str(codigo_seleccionado))
+            self.entry_cantidad.focus() 
 
     def procesar_venta_gui(self):
-        """Lee los datos de la interfaz y los manda al backend."""
-        from main import Producto # Importamos tu backend de productos
-        
+        from main import Producto 
+        from tkinter import messagebox
         codigo = self.entry_codigo.get()
         cantidad_str = self.entry_cantidad.get()
 
         if not codigo or not cantidad_str:
-            messagebox.showwarning("Campos vacíos", "Por favor ingresa el código y la cantidad.")
+            messagebox.showwarning("Campos vacíos", "Ingresa el código y cantidad.")
             return
 
         try:
             cantidad = int(cantidad_str)
-            # Como aún no guardamos el ID exacto del usuario activo en el frontend, 
-            # usaremos temporalmente el ID 1 (el administrador principal) para registrar la venta
-            id_cajero_temporal = 1 
+            exito, mensaje = Producto.vender(codigo, cantidad, self.id_usuario)
             
-            # Llamamos a TU función del backend
-            Producto.vender(codigo, cantidad, id_cajero_temporal)
-            
-            messagebox.showinfo("Proceso finalizado", "Venta procesada. Revisa la terminal para ver los detalles del recibo o posibles alertas de inventario.")
-            
-            # Limpiamos las casillas para la siguiente venta
-            self.entry_codigo.delete(0, 'end')
-            self.entry_cantidad.delete(0, 'end')
+            if exito:
+                messagebox.showinfo("Venta Procesada", mensaje)
+                self.entry_codigo.delete(0, 'end')
+                self.entry_cantidad.delete(0, 'end')
+                self.cargar_tabla_pos() # Recarga la tabla en vivo
+            else:
+                messagebox.showwarning("Alerta", mensaje)
 
         except ValueError:
             messagebox.showerror("Error", "La cantidad debe ser un número entero.")
@@ -223,54 +287,6 @@ class VentanaDashboard(ctk.CTk):
         messagebox.showinfo("Éxito", "¡El sistema ha sido personalizado!")
         self.entry_nombre_gym.delete(0, 'end') 
         
-    def mostrar_pos(self):
-        """Muestra la interfaz del cajero para vender productos."""
-        self.limpiar_main_frame()
-        
-        lbl_titulo = ctk.CTkLabel(self.main_frame, text="🛒 Punto de Venta (POS)", font=("Roboto", 24, "bold"))
-        lbl_titulo.pack(pady=(40, 20))
-
-        # Contenedor para alinear los inputs
-        frame_form = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        frame_form.pack(pady=20)
-
-        # Input de Código
-        self.entry_codigo = ctk.CTkEntry(frame_form, width=200, placeholder_text="Código del Producto")
-        self.entry_codigo.grid(row=0, column=0, padx=10, pady=10)
-
-        # Input de Cantidad
-        self.entry_cantidad = ctk.CTkEntry(frame_form, width=200, placeholder_text="Cantidad (Ej: 1)")
-        self.entry_cantidad.grid(row=0, column=1, padx=10, pady=10)
-
-        # Botón para procesar
-        btn_vender = ctk.CTkButton(self.main_frame, text="💵 Procesar Venta", width=200, fg_color="green", hover_color="darkgreen", command=self.procesar_venta_gui)
-        btn_vender.pack(pady=20)
-
-    def procesar_venta_gui(self):
-        from main import Producto 
-        
-        codigo = self.entry_codigo.get()
-        cantidad_str = self.entry_cantidad.get()
-
-        if not codigo or not cantidad_str:
-            messagebox.showwarning("Campos vacíos", "Por favor ingresa el código y la cantidad.")
-            return
-
-        try:
-            cantidad = int(cantidad_str)
-            id_cajero_temporal = 1 
-            
-            exito, mensaje = Producto.vender(codigo, cantidad, id_cajero_temporal)
-            
-            if exito:
-                messagebox.showinfo("Venta Procesada", mensaje)
-                self.entry_codigo.delete(0, 'end')
-                self.entry_cantidad.delete(0, 'end')
-            else:
-                messagebox.showwarning("Alerta de Venta", mensaje)
-
-        except ValueError:
-            messagebox.showerror("Error", "La cantidad debe ser un número entero.")
             
     # --- NUEVAS FUNCIONES PARA EL CONTROL DE PUERTA ---
     def mostrar_puerta(self):
@@ -327,60 +343,57 @@ class VentanaDashboard(ctk.CTk):
         
     # --- NUEVAS FUNCIONES PARA LOS REPORTES ---
     def mostrar_reportes(self):
-        """Consulta el backend y dibuja las tarjetas financieras."""
+        """Consulta el backend y dibuja las tarjetas financieras y el formulario de gastos."""
         self.limpiar_main_frame()
         
         lbl_titulo = ctk.CTkLabel(self.main_frame, text="📊 Resumen Financiero", font=("Roboto", 24, "bold"))
-        lbl_titulo.pack(pady=(40, 20))
+        lbl_titulo.pack(pady=(20, 10))
 
-        # Importamos el Dashboard de tu backend
         from main import Dashboard
-        
-        # Le pedimos los datos a la base de datos
         exito, datos = Dashboard.generar_reporte_financiero()
 
         if not exito:
             messagebox.showerror("Error", f"No se pudo cargar el reporte: {datos}")
             return
 
-        # Contenedor (Cuadrícula) para organizar las 4 tarjetas
+        # Tarjetas financieras
         frame_cards = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        frame_cards.pack(pady=20, fill="x", padx=40)
+        frame_cards.pack(pady=10, fill="x", padx=40)
         frame_cards.grid_columnconfigure((0, 1), weight=1)
 
-        # 1. Tarjeta de Ingresos (Verde Oscuro)
+        # 1. Ingresos
         card_ingresos = ctk.CTkFrame(frame_cards, corner_radius=10, fg_color="#1f532b")
         card_ingresos.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         ctk.CTkLabel(card_ingresos, text="📈 Total Ingresos", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
         ctk.CTkLabel(card_ingresos, text=f"${datos['ingresos']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
 
-        # 2. Tarjeta de Gastos (Rojo Oscuro)
+        # 2. Gastos
         card_gastos = ctk.CTkFrame(frame_cards, corner_radius=10, fg_color="#7a2424")
         card_gastos.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
         ctk.CTkLabel(card_gastos, text="📉 Total Gastos", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
         ctk.CTkLabel(card_gastos, text=f"${datos['gastos']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
 
-        # 3. Tarjeta de Anulaciones (Naranja/Mostaza)
+        # 3. Anulaciones
         card_anulaciones = ctk.CTkFrame(frame_cards, corner_radius=10, fg_color="#9c6614")
         card_anulaciones.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
         ctk.CTkLabel(card_anulaciones, text="⚠️ Total Anulaciones", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
         ctk.CTkLabel(card_anulaciones, text=f"${datos['anulaciones']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
 
-        # 4. Tarjeta de Utilidad Neta (Azul Oscuro, o Rojo si hay pérdidas)
+        # 4. Neta
         color_utilidad = "#1e3d59" if datos['neta'] >= 0 else "#7a2424"
         card_neta = ctk.CTkFrame(frame_cards, corner_radius=10, fg_color=color_utilidad)
         card_neta.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
         ctk.CTkLabel(card_neta, text="💰 UTILIDAD NETA", font=("Roboto", 18, "bold"), text_color="white").pack(pady=(15, 0))
         ctk.CTkLabel(card_neta, text=f"${datos['neta']:,.2f}", font=("Roboto", 28, "bold"), text_color="white").pack(pady=(5, 15))
         
-        # Botón para actualizar en tiempo real
         btn_refresh = ctk.CTkButton(self.main_frame, text="🔄 Actualizar Datos", command=self.mostrar_reportes)
-        btn_refresh.pack(pady=30)
-        
+        btn_refresh.pack(pady=10)
+
+        # --- SECCIÓN: REGISTRAR GASTO ---
         frame_gasto = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_gasto.pack(pady=10, fill="x", padx=40)
         
-        ctk.CTkLabel(frame_gasto, text="💸 Registrar Nuevo Gasto", font=("Roboto", 18, "bold")).pack(pady=10)
+        ctk.CTkLabel(frame_gasto, text="💸 Registrar Nuevo Gasto", font=("Roboto", 18, "bold")).pack(pady=5)
         
         self.gasto_desc = ctk.CTkEntry(frame_gasto, width=350, placeholder_text="Descripción (Ej: Pago de luz, Mantenimiento)")
         self.gasto_desc.pack(pady=5)
@@ -388,10 +401,12 @@ class VentanaDashboard(ctk.CTk):
         self.gasto_monto = ctk.CTkEntry(frame_gasto, width=350, placeholder_text="Monto en dinero (Ej: 50000)")
         self.gasto_monto.pack(pady=5)
         
+        # AQUÍ ESTÁ EL BOTÓN QUE LLAMA A LA FUNCIÓN
         btn_gasto = ctk.CTkButton(frame_gasto, text="Registrar Salida de Dinero", fg_color="#7a2424", hover_color="#5c1a1a", command=self.guardar_gasto_gui)
-        btn_gasto.pack(pady=15)
-        
+        btn_gasto.pack(pady=10)
+
     def guardar_gasto_gui(self):
+        """Captura el gasto y lo envía a la base de datos."""
         from main import Dashboard
         desc = self.gasto_desc.get()
         monto_str = self.gasto_monto.get()
@@ -402,12 +417,11 @@ class VentanaDashboard(ctk.CTk):
 
         try:
             monto = float(monto_str)
-            # Usamos el id_usuario que ya guardamos en la clase
             exito, mensaje = Dashboard.registrar_gasto(monto, desc, self.id_usuario)
             
             if exito:
                 messagebox.showinfo("Gasto Registrado", mensaje)
-                self.mostrar_reportes() # Recargamos la pantalla para actualizar las gráficas
+                self.mostrar_reportes() # Recarga la pantalla para que la gráfica baje al instante
             else:
                 messagebox.showerror("Error", mensaje)
         except ValueError:

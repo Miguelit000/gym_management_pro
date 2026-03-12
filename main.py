@@ -377,6 +377,20 @@ class Producto:
             return False, f"Error al actualizar inventario: {e}"
         finally:
             conexion.close()
+            
+    @staticmethod
+    def obtener_todos():
+        """Devuelve todos los productos registrados para llenar la tabla."""
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute("SELECT codigo, nombre, precio_venta, stock FROM Producto")
+            productos = cursor.fetchall()
+            return True, productos
+        except Exception as e:
+            return False, f"Error al cargar productos: {e}"
+        finally:
+            conexion.close()
                   
 class Dashboard:
     @staticmethod
