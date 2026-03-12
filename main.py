@@ -29,7 +29,6 @@ class Usuario:
         return hashlib.sha256(clave.encode()).hexdigest()
     
     def registrar(self):
-        
         conexion = conectar_db()
         cursor = conexion.cursor()
         
@@ -39,10 +38,10 @@ class Usuario:
                 (self.id_rol, self.documento, self.nombre, self.clave_hash)
             )
             conexion.commit()
-            print(f"Exito: Usuario '{self.nombre}' registrado correctamente.")
+            return True, f"Éxito: Usuario '{self.nombre}' registrado correctamente."
             
         except sqlite3.IntegrityError:
-            print(f"Error: El documento '{self.documento}' ya esta registrado.")
+            return False, f"Error: El documento '{self.documento}' ya está registrado."
             
         finally:
             conexion.close()
@@ -109,9 +108,11 @@ class Cliente:
                 (self.documento, self.nombre, self.telefono, self.email)
             )
             conexion.commit()
-            print(f"Cliente '{self.nombre}' registrado correctamente.")
+            return True, f"Cliente '{self.nombre}' registrado correctamente."
         except sqlite3.IntegrityError:
-            print(f"Error: El cliente con documento '{self.documento}' ya exite en el sistema.")
+            return False, f"Error: El cliente con documento '{self.documento}' ya existe en el sistema."
+        except Exception as e:
+            return False, f"Error inesperado: {e}"
         finally:
             conexion.close()
             
@@ -147,20 +148,21 @@ class Membresia:
                 (self.id_cliente, self.id_plan, str(self.fecha_inicio), str(self.fecha_fin))
             )
             conexion.commit()
-            print(f"Membresia registrada: Del {self.fecha_inicio} al {self.fecha_fin}.")
+            return True, f"Membresía registrada: Del {self.fecha_inicio} al {self.fecha_fin}."
         except Exception as e:
-            print(f"Error al registrar memebresia: {e}")
+            return False, f"Error al registrar membresía: {e}"
         finally:
             conexion.close()
     
     @staticmethod
     def crear_nueva(id_cliente, id_plan, dias_duracion):
         fecha_inicio = date.today()
+        # Calculamos la fecha de vencimiento sumando los días al día de hoy
         fecha_fin = fecha_inicio + timedelta(days=dias_duracion)
         
         nueva_membresia = Membresia(id_cliente, id_plan, fecha_inicio, fecha_fin)
-        nueva_membresia.registrar()
-        return nueva_membresia
+        exito, mensaje = nueva_membresia.registrar()
+        return exito, mensaje
     
     @staticmethod
     def verificar_estado(documento_cliente):
@@ -260,24 +262,23 @@ class  Transaccion:
 class Asistencia:
     @staticmethod
     def registrar_entrada(documento):
-        
         cliente = Cliente.buscar_por_documento(documento)
         
         if not cliente:
-            print("\n" + "="*50)
-            print("ALERTA: Tarjeta o documento no reconocido")
-            print("="*50 + "\n")
-            return
+            return False, "ALERTA: Tarjeta o documento no reconocido en el sistema."
         
         id_cliente = cliente[0]
-        
         estado_mensaje = Membresia.verificar_estado(documento)
         
         estado_bd = "Denegado"
-        if "🟢" in estado_mensaje:
+        acceso_concedido = False
+        
+        if "Acceso Permitido" in estado_mensaje:
             estado_bd = "Permitido"
-        elif "🟡" in estado_mensaje:
+            acceso_concedido = True
+        elif "Acceso en gracia" in estado_mensaje:
             estado_bd = "Gracia"
+            acceso_concedido = True
             
         conexion = conectar_db()
         cursor = conexion.cursor()
@@ -285,29 +286,22 @@ class Asistencia:
                 CREATE TABLE IF NOT EXISTS Asistencia (
                     id_asistencia INTEGER PRIMARY KEY AUTOINCREMENT,
                     id_cliente INTEGER,
-                    fecha_hora DATETIME CURRENT_TIMESTAMP,
+                    fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
                     estado_acceso TEXT,
                     FOREIGN KEY (id_cliente) REFERENCES Cliente(id_cliente)
                     )
                 ''')
             
         try:
-            cursor.execute(
-                "INSERT INTO Asistencia (id_cliente, estado_acceso) VALUES (?,?)",
-                (id_cliente, estado_bd)
-            )
-            
+            cursor.execute("INSERT INTO Asistencia (id_cliente, estado_acceso) VALUES (?,?)", (id_cliente, estado_bd))
             conexion.commit()
-            
-            print("\n" + "="*50)
-            print(estado_mensaje)
-            print("="*50 + "\n")
+            return acceso_concedido, estado_mensaje
             
         except Exception as e:
-            print(f"Error al guardar el registro de asistencia: {e}")
+            return False, f"Error al guardar el registro de asistencia: {e}"
         finally:
             conexion.close()
-            
+    
 class Producto:
     def __init__(self, codigo, nombre, precio_venta, stock, id_producto=None):
         self.id_producto = id_producto
@@ -325,9 +319,9 @@ class Producto:
                 (self.codigo, self.nombre, self.precio_venta, self.stock)
             )
             conexion.commit()
-            print(f"Producto registrado: {self.nombre} (Stock inicial: {self.stock})")
+            return True, f"Producto registrado: {self.nombre} (Stock inicial: {self.stock})"
         except sqlite3.IntegrityError:
-            print(f"Error: El codigo de producto '{self.codigo}' ya existe.")
+            return False, f"Error: El código de producto '{self.codigo}' ya existe."
         finally:
             conexion.close()
             
@@ -341,14 +335,12 @@ class Producto:
             producto = cursor.fetchone()
             
             if not producto:
-                print(f"Error: Producto con codigo '{codigo_producto}' no encontrado.")
-                return
+                return False, f"Producto con código '{codigo_producto}' no encontrado."
             
             id_prod, nombre, precio, stock_actual = producto
             
             if stock_actual < cantidad:
-                print(f"Alerta de Inventario: No hay suficientes stock de '{nombre}'. Disponible: {stock_actual}.")
-                return
+                return False, f"Alerta de Inventario: No hay suficiente stock de '{nombre}'. Disponible: {stock_actual}."
             
             total_venta = precio * cantidad
             nuevo_stock = stock_actual - cantidad
@@ -363,92 +355,52 @@ class Producto:
             )
             
             conexion.commit()
-            print(f"Venta exitosa: {cantidad}x {nombre}. Total: ${total_venta:,.2f}. (Stock restante: {nuevo_stock})")
+            return True, f"Venta exitosa: {cantidad}x {nombre}\nTotal: ${total_venta:,.2f}\n(Stock restante: {nuevo_stock})"
         
         except Exception as e:
             conexion.rollback()
-            print(f"Error critico en la venta: {e}")
+            return False, f"Error crítico en la venta: {e}"
         finally:
             conexion.close()
-            
+                  
 class Dashboard:
     @staticmethod
     def generar_reporte_financiero():
         conexion = conectar_db()
         cursor = conexion.cursor()
         
-        # Declaramos las variables desde el inicio para evitar warnings
         total_ingresos = 0.0
         total_gastos = 0.0
         total_anulaciones = 0.0
         utilidad_neta = 0.0
         
         try: 
-            # 1. Ingresos
             cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Ingreso'")
             fila_ingresos = cursor.fetchone()
-            # Corregido: Usamos el mismo nombre de la variable
             if fila_ingresos: total_ingresos = fila_ingresos[0]
             
-            # 2. Gastos
             cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Gasto'")
             fila_gastos = cursor.fetchone()
-            # Corregido: Quitamos el "_" y usamos fila_gastos
             if fila_gastos: total_gastos = fila_gastos[0]
             
-            # 3. Anulaciones
             cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Anulacion'")
             fila_anulaciones = cursor.fetchone()
-            # Corregido: Usamos fila_anulaciones
             if fila_anulaciones: total_anulaciones = fila_anulaciones[0]
             
-            # Calculamos la utilidad
             utilidad_neta = total_ingresos + total_gastos + total_anulaciones
             
-            print("\n" + "="*50)
-            print("\n --- REPORTE FINANCIERO ---")
-            print("="*50)
-            print(f"Total Ingresos:    ${total_ingresos:,.2f}")
-            print(f"Total Gastos:      ${total_gastos:,.2f}")
-            print(f"Total Anulaciones: ${total_anulaciones:,.2f}")
-            print("-" * 50)
-            print(f"UTILIDAD NETA:     ${utilidad_neta:,.2f}")
-            print("="*50 + "\n")
+            # En lugar de imprimir, devolvemos un diccionario con los números limpios
+            datos = {
+                "ingresos": total_ingresos,
+                "gastos": total_gastos,
+                "anulaciones": total_anulaciones,
+                "neta": utilidad_neta
+            }
+            return True, datos
             
         except Exception as e:
-            print(f"Error al generar el reporte: {e}")
+            return False, f"Error al generar el reporte: {e}"
             
         finally:
             conexion.close()
-            
-    @staticmethod
-    def ver_auditoria_reciente(limite=5):
-        conexion = conectar_db()
-        cursor = conexion.cursor()
-        
-        try:
-            cursor.execute('''
-                    SELECT a.fecha, u.nombre, a.accion, a.tabla_afectada
-                    FROM Auditoria a
-                    JOIN Usuario u ON a.id_usuario = u.id_usuario
-                    ORDER BY a.fecha DESC LIMIT ?
-                ''', (limite,))
-            
-            registros = cursor.fetchall()
-            
-            print("\n" + "="*50)
-            print("\n --- REGISTRO DE AUDITORÍA DE SEGURIDAD ---")
-            print("="*50)
-            if not registros:
-                print("No hay eventos de seguridad registrados.")
-            else:
-                for reg in registros:
-                    fecha, usuario, accion, tabla = reg
-                    print(f"[{fecha[:16]}] {usuario} -> ejecuto {accion} en la tabla {tabla}")
-            print("="*50 + "\n")
-            
-        except Exception as e:
-            print(f"Error al consultar auditoria: {e}")
-        finally: 
-            conexion.close()  
             
