@@ -1,6 +1,6 @@
 import customtkinter as ctk
-from tkinter import messagebox, filedialog # Agregamos filedialog
-from PIL import Image # Agregamos PIL para los logos
+from tkinter import messagebox, filedialog 
+from PIL import Image 
 from main import Usuario
 
 ctk.set_appearance_mode("System")  
@@ -42,7 +42,6 @@ class VentanaLogin(ctk.CTk):
 
         if usuario_valido:
             self.destroy() 
-            # Desempaquetamos los 3 datos exactos
             id_usuario, id_rol, nombre = usuario_valido
             dashboard = VentanaDashboard(id_usuario, id_rol, nombre)
             dashboard.mainloop()
@@ -54,7 +53,6 @@ class VentanaDashboard(ctk.CTk):
     def __init__(self, id_usuario, id_rol, nombre_usuario):
         super().__init__()
         
-        # Guardamos los datos del usuario activo para usarlos en toda la ventana
         self.id_usuario = id_usuario
         self.id_rol = id_rol
         self.nombre_usuario = nombre_usuario
@@ -65,23 +63,19 @@ class VentanaDashboard(ctk.CTk):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        # --- MENÚ LATERAL (SIDEBAR) ---
         self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
         self.sidebar_frame.grid_rowconfigure(11, weight=1) 
 
-        # 👇 CARGAMOS LA CONFIGURACIÓN PERMANENTE 👇
         from main import Configuracion
         nombre_guardado, ruta_logo_guardada = Configuracion.cargar()
 
         self.logo_img_label = ctk.CTkLabel(self.sidebar_frame, text="")
         self.logo_img_label.grid(row=0, column=0, padx=20, pady=(20, 0))
 
-        # Ponemos el nombre guardado en lugar de un texto fijo
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text=nombre_guardado, font=("Roboto", 24, "bold"))
         self.logo_label.grid(row=1, column=0, padx=20, pady=(5, 20))
 
-        # Si hay una ruta de logo guardada, la cargamos visualmente
         if ruta_logo_guardada and ruta_logo_guardada != "":
             try:
                 from PIL import Image
@@ -89,10 +83,8 @@ class VentanaDashboard(ctk.CTk):
                 imagen_ctk = ctk.CTkImage(light_image=imagen_pil, dark_image=imagen_pil, size=(100, 100))
                 self.logo_img_label.configure(image=imagen_ctk)
             except Exception:
-                pass # Si por alguna razón borraste la imagen de tu PC, simplemente no la muestra
-        # 👆 FIN DE LA CARGA DE CONFIGURACIÓN 👆
+                pass 
 
-        # Botones PÚBLICOS (Los ven tanto Admins como Recepcionistas)
         self.btn_pos = ctk.CTkButton(self.sidebar_frame, text="Punto de Venta", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_pos)
         self.btn_pos.grid(row=2, column=0, padx=20, pady=10)
 
@@ -108,7 +100,6 @@ class VentanaDashboard(ctk.CTk):
         self.btn_inventario = ctk.CTkButton(self.sidebar_frame, text="Inventario", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_inventario)
         self.btn_inventario.grid(row=6, column=0, padx=20, pady=10)
 
-        # Botones PRIVADOS (Solo los ven los Administradores - ID Rol 2)
         if self.id_rol == 2:
             self.btn_reportes = ctk.CTkButton(self.sidebar_frame, text="Reportes y Gastos", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_reportes)
             self.btn_reportes.grid(row=7, column=0, padx=20, pady=10)
@@ -116,15 +107,12 @@ class VentanaDashboard(ctk.CTk):
             self.btn_usuarios = ctk.CTkButton(self.sidebar_frame, text="Gestión de Usuarios", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_usuarios)
             self.btn_usuarios.grid(row=8, column=0, padx=20, pady=10)
 
-            # 👇 NUEVO BOTÓN DE PLANES 👇
             self.btn_planes = ctk.CTkButton(self.sidebar_frame, text="Gestión de Planes", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_planes)
             self.btn_planes.grid(row=9, column=0, padx=20, pady=10)
 
-            # Bajamos configuración a la fila 10
             self.btn_config = ctk.CTkButton(self.sidebar_frame, text="Configuración", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_configuracion)
             self.btn_config.grid(row=10, column=0, padx=20, pady=10)
 
-        # Info del usuario (Bajamos a la fila 11)
         rol_texto = "Administrador" if self.id_rol == 2 else "Recepcionista"
         self.lbl_usuario = ctk.CTkLabel(self.sidebar_frame, text=f"👤 {self.nombre_usuario}\n({rol_texto})")
         self.lbl_usuario.grid(row=11, column=0, padx=20, pady=20, sticky="s")
@@ -135,17 +123,12 @@ class VentanaDashboard(ctk.CTk):
         self.mostrar_inicio()
 
     
-
-    # --- NUEVAS FUNCIONES PARA EL PUNTO DE VENTA ---
-    # --- FUNCIONES PARA EL PUNTO DE VENTA ---
-    
     def mostrar_pos(self):
         self.limpiar_main_frame()
         
         lbl_titulo = ctk.CTkLabel(self.main_frame, text="🛒 Punto de Venta (POS)", font=("Roboto", 24, "bold"))
         lbl_titulo.pack(pady=(20, 10))
 
-        # --- SECCIÓN 1: FORMULARIO DE VENTA ---
         frame_form = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_form.pack(pady=10)
 
@@ -158,11 +141,9 @@ class VentanaDashboard(ctk.CTk):
         btn_vender = ctk.CTkButton(frame_form, text="💵 Procesar Venta", fg_color="green", hover_color="darkgreen", command=self.procesar_venta_gui)
         btn_vender.grid(row=0, column=2, padx=10, pady=10)
 
-        # --- SECCIÓN 2: LA TABLA DE PRODUCTOS ---
         ctk.CTkLabel(self.main_frame, text="📦 Catálogo de Productos Disponibles", font=("Roboto", 16, "bold")).pack(pady=(20, 5))
         ctk.CTkLabel(self.main_frame, text="*Haz un clic en un producto para pasarlo al cajero*", font=("Roboto", 12, "italic")).pack(pady=(0, 10))
         
-        # Importamos la herramienta de tablas aquí directo por seguridad
         from tkinter import ttk 
         style = ttk.Style()
         style.theme_use("default")
@@ -190,22 +171,18 @@ class VentanaDashboard(ctk.CTk):
         self.tabla_productos.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Evento de clic simple para seleccionar
         self.tabla_productos.bind("<<TreeviewSelect>>", self.seleccionar_producto_tabla)
         
-        # Llenamos la tabla al abrir la ventana
         self.cargar_tabla_pos()
 
     def cargar_tabla_pos(self):
         from main import Producto
         from tkinter import messagebox
         
-        # Limpiamos la tabla
         for item in self.tabla_productos.get_children():
             self.tabla_productos.delete(item)
             
         try:
-            # Llamamos al backend
             exito, productos = Producto.obtener_todos()
             
             if exito:
@@ -246,7 +223,7 @@ class VentanaDashboard(ctk.CTk):
                 messagebox.showinfo("Venta Procesada", mensaje)
                 self.entry_codigo.delete(0, 'end')
                 self.entry_cantidad.delete(0, 'end')
-                self.cargar_tabla_pos() # Recarga la tabla en vivo
+                self.cargar_tabla_pos() 
             else:
                 messagebox.showwarning("Alerta", mensaje)
 
@@ -296,16 +273,9 @@ class VentanaDashboard(ctk.CTk):
         from PIL import Image
         
         nuevo_nombre = self.entry_nombre_gym.get()
-        
-        # Obtenemos los datos actuales por si el usuario dejó un campo en blanco
         nombre_actual, logo_actual = Configuracion.cargar()
-        
-        # Si escribió algo, usamos el nuevo. Si no, dejamos el que estaba.
         nombre_final = nuevo_nombre if nuevo_nombre.strip() != "" else nombre_actual
-        # Si seleccionó imagen, usamos la nueva. Si no, dejamos la que estaba.
         ruta_final = self.ruta_logo_temp if self.ruta_logo_temp else logo_actual
-
-        # 1. Actualizamos la Interfaz Gráfica al instante
         self.logo_label.configure(text=nombre_final)
             
         if self.ruta_logo_temp:
@@ -317,18 +287,16 @@ class VentanaDashboard(ctk.CTk):
                 messagebox.showerror("Error", f"No se pudo cargar la imagen visualmente: {e}")
                 return
 
-        # 2. Guardamos en la Base de Datos para siempre
         exito, mensaje = Configuracion.guardar(nombre_final, ruta_final)
         
         if exito:
             messagebox.showinfo("Éxito", "¡El sistema ha sido personalizado permanentemente!")
             self.entry_nombre_gym.delete(0, 'end')
-            self.ruta_logo_temp = None # Reseteamos la ruta temporal
+            self.ruta_logo_temp = None 
         else:
             messagebox.showerror("Error al guardar", mensaje) 
         
             
-    # --- NUEVAS FUNCIONES PARA EL CONTROL DE PUERTA ---
     def mostrar_puerta(self):
         """Muestra la interfaz del semáforo de acceso."""
         self.limpiar_main_frame()
@@ -336,20 +304,15 @@ class VentanaDashboard(ctk.CTk):
         lbl_titulo = ctk.CTkLabel(self.main_frame, text="🚪 Control de Acceso", font=("Roboto", 24, "bold"))
         lbl_titulo.pack(pady=(40, 20))
 
-        # Input para simular el escáner de tarjeta o digitación manual
         self.entry_doc_puerta = ctk.CTkEntry(self.main_frame, width=300, placeholder_text="Escanea tarjeta o digita documento", font=("Roboto", 16))
         self.entry_doc_puerta.pack(pady=10)
 
-        # Botón para verificar
         btn_verificar = ctk.CTkButton(self.main_frame, text="🔍 Verificar Acceso", width=300, command=self.verificar_acceso_gui)
         btn_verificar.pack(pady=10)
 
-        # Semáforo Visual (Un recuadro que cambiará de color)
         self.frame_semaforo = ctk.CTkFrame(self.main_frame, width=450, height=150, corner_radius=15, fg_color="gray20")
         self.frame_semaforo.pack(pady=40)
-        self.frame_semaforo.pack_propagate(False) # Evita que el recuadro se encoja al tamaño del texto
-
-        # Texto dentro del semáforo
+        self.frame_semaforo.pack_propagate(False)
         self.lbl_mensaje_puerta = ctk.CTkLabel(self.frame_semaforo, text="Esperando lectura de tarjeta...", font=("Roboto", 18, "bold"), text_color="white", wraplength=400)
         self.lbl_mensaje_puerta.place(relx=0.5, rely=0.5, anchor=ctk.CENTER)
 
@@ -363,28 +326,21 @@ class VentanaDashboard(ctk.CTk):
             messagebox.showwarning("Campo vacío", "Por favor ingresa un documento.")
             return
 
-        # Consultamos al backend que modificamos en el paso anterior
         acceso_concedido, mensaje = Asistencia.registrar_entrada(documento)
 
-        # Actualizamos el texto del semáforo
         self.lbl_mensaje_puerta.configure(text=mensaje)
 
-        # Lógica de colores (Semáforo)
         if "Acceso Permitido" in mensaje:
-            self.frame_semaforo.configure(fg_color="#228B22") # Verde bosque
+            self.frame_semaforo.configure(fg_color="#228B22") 
         elif "Acceso en gracia" in mensaje:
-            self.frame_semaforo.configure(fg_color="#D4A017") # Amarillo/Dorado
+            self.frame_semaforo.configure(fg_color="#D4A017") 
             messagebox.showinfo("Aviso de Recepción", "Recuerda cobrarle a este cliente pronto.")
         else:
-            self.frame_semaforo.configure(fg_color="#8B0000") # Rojo oscuro
+            self.frame_semaforo.configure(fg_color="#8B0000") 
 
-        # Limpiamos el campo para el siguiente cliente
         self.entry_doc_puerta.delete(0, 'end')
         
-    # --- NUEVAS FUNCIONES PARA LOS REPORTES ---
-    # =========================================================
-    # --- FUNCIONES PARA LOS REPORTES (FASE 7 - HISTORIAL) ---
-    # =========================================================
+    
     def mostrar_reportes(self):
         """Dibuja la estructura base de los reportes y el filtro de fechas."""
         self.limpiar_main_frame()
@@ -392,7 +348,6 @@ class VentanaDashboard(ctk.CTk):
         lbl_titulo = ctk.CTkLabel(self.main_frame, text="📊 Resumen Financiero", font=("Roboto", 24, "bold"))
         lbl_titulo.pack(pady=(20, 10))
 
-        # --- SECCIÓN 1: FILTRO DE MESES ---
         frame_filtros = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_filtros.pack(pady=5)
 
@@ -401,20 +356,17 @@ class VentanaDashboard(ctk.CTk):
 
         ctk.CTkLabel(frame_filtros, text="📅 Período:").grid(row=0, column=0, padx=10)
 
-        # Opciones: Mes actual, meses anteriores de prueba, y "TODO"
         self.combo_periodo = ctk.CTkComboBox(frame_filtros, values=[mes_actual, "2026-02", "2026-01", "TODO"])
         self.combo_periodo.grid(row=0, column=1, padx=10)
-        self.combo_periodo.set(mes_actual) # Por defecto arranca en este mes
+        self.combo_periodo.set(mes_actual) 
 
         btn_filtrar = ctk.CTkButton(frame_filtros, text="🔍 Consultar", width=120, command=self.cargar_tarjetas_reporte)
         btn_filtrar.grid(row=0, column=2, padx=10)
 
-        # --- SECCIÓN 2: CONTENEDOR DE TARJETAS (Vacío al inicio) ---
         self.frame_cards = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         self.frame_cards.pack(pady=10, fill="x", padx=40)
         self.frame_cards.grid_columnconfigure((0, 1), weight=1)
 
-        # --- SECCIÓN 3: REGISTRAR GASTO ---
         frame_gasto = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_gasto.pack(pady=10, fill="x", padx=40)
         
@@ -427,12 +379,9 @@ class VentanaDashboard(ctk.CTk):
         btn_gasto = ctk.CTkButton(frame_gasto, text="Registrar Salida de Dinero", fg_color="#7a2424", hover_color="#5c1a1a", command=self.guardar_gasto_gui)
         btn_gasto.pack(pady=10)
 
-        # Llamamos a los datos la primera vez que se abre la ventana
         self.cargar_tarjetas_reporte()
 
     def cargar_tarjetas_reporte(self):
-        """Limpia las tarjetas viejas y dibuja las nuevas según el mes elegido."""
-        # Destruir tarjetas anteriores si existen
         for widget in self.frame_cards.winfo_children():
             widget.destroy()
 
@@ -445,25 +394,21 @@ class VentanaDashboard(ctk.CTk):
             messagebox.showerror("Error", f"No se pudo cargar el reporte: {datos}")
             return
 
-        # 1. Ingresos
         card_ingresos = ctk.CTkFrame(self.frame_cards, corner_radius=10, fg_color="#1f532b")
         card_ingresos.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         ctk.CTkLabel(card_ingresos, text="📈 Ingresos", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
         ctk.CTkLabel(card_ingresos, text=f"${datos['ingresos']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
 
-        # 2. Gastos
         card_gastos = ctk.CTkFrame(self.frame_cards, corner_radius=10, fg_color="#7a2424")
         card_gastos.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
         ctk.CTkLabel(card_gastos, text="📉 Gastos", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
         ctk.CTkLabel(card_gastos, text=f"${datos['gastos']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
 
-        # 3. Anulaciones
         card_anulaciones = ctk.CTkFrame(self.frame_cards, corner_radius=10, fg_color="#9c6614")
         card_anulaciones.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
         ctk.CTkLabel(card_anulaciones, text="⚠️ Anulaciones", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
         ctk.CTkLabel(card_anulaciones, text=f"${datos['anulaciones']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
 
-        # 4. Utilidad Neta
         color_utilidad = "#1e3d59" if datos['neta'] >= 0 else "#7a2424"
         card_neta = ctk.CTkFrame(self.frame_cards, corner_radius=10, fg_color=color_utilidad)
         card_neta.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
@@ -488,24 +433,18 @@ class VentanaDashboard(ctk.CTk):
                 messagebox.showinfo("Gasto Registrado", mensaje)
                 self.gasto_desc.delete(0, 'end')
                 self.gasto_monto.delete(0, 'end')
-                # 🔄 Recargamos las tarjetas al instante para ver la bajada en utilidad
                 self.cargar_tarjetas_reporte() 
             else:
                 messagebox.showerror("Error", mensaje)
         except ValueError:
             messagebox.showerror("Error", "El monto debe ser un número válido.")
-    # =========================================================
-        
-      # =========================================================
-    # --- FUNCIONES PARA GESTIÓN DE CLIENTES (FASE 3 - CRUD) ---
-    # =========================================================
+    
     def mostrar_clientes(self):
         self.limpiar_main_frame()
         
         lbl_titulo = ctk.CTkLabel(self.main_frame, text="👥 Gestión de Clientes", font=("Roboto", 24, "bold"))
         lbl_titulo.pack(pady=(20, 10))
 
-        # --- FORMULARIO ---
         frame_form = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_form.pack(pady=10)
 
@@ -521,7 +460,6 @@ class VentanaDashboard(ctk.CTk):
         self.entry_email_cliente = ctk.CTkEntry(frame_form, width=200, placeholder_text="Correo Electrónico")
         self.entry_email_cliente.grid(row=1, column=1, padx=10, pady=10)
 
-        # --- BOTONES DE ACCIÓN (CRUD) ---
         frame_botones = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_botones.pack(pady=10)
 
@@ -530,7 +468,6 @@ class VentanaDashboard(ctk.CTk):
         ctk.CTkButton(frame_botones, text="🗑️ Eliminar", fg_color="#7a2424", hover_color="#5c1a1a", width=120, command=self.eliminar_cliente_gui).grid(row=0, column=2, padx=5)
         ctk.CTkButton(frame_botones, text="🧹 Limpiar Campos", fg_color="gray", width=120, command=self.limpiar_form_cliente).grid(row=0, column=3, padx=5)
 
-        # --- TABLA DE CLIENTES ---
         from tkinter import ttk
         style = ttk.Style()
         style.theme_use("default")
@@ -572,13 +509,11 @@ class VentanaDashboard(ctk.CTk):
                 self.tabla_clientes.insert("", "end", values=(cli[0], cli[1], cli[2], cli[3]))
 
     def seleccionar_cliente_tabla(self, event):
-        """Pasa los datos del cliente seleccionado al formulario."""
         seleccion = self.tabla_clientes.selection()
         if seleccion:
             item = self.tabla_clientes.item(seleccion[0])
             datos = item['values']
             
-            # Habilitamos temporalmente por si estaba bloqueado
             self.entry_doc_cliente.configure(state="normal")
             
             self.limpiar_form_cliente(desbloquear=False)
@@ -588,7 +523,6 @@ class VentanaDashboard(ctk.CTk):
             self.entry_tel_cliente.insert(0, str(datos[2]))
             self.entry_email_cliente.insert(0, str(datos[3]))
             
-            # BLOQUEAMOS EL DOCUMENTO para que no lo editen
             self.entry_doc_cliente.configure(state="disabled")
 
     def limpiar_form_cliente(self, desbloquear=True):
@@ -623,7 +557,6 @@ class VentanaDashboard(ctk.CTk):
 
     def actualizar_cliente_gui(self):
         from main import Cliente
-        # Leemos el documento así esté deshabilitado visualmente
         doc = self.entry_doc_cliente.get()
         nom = self.entry_nom_cliente.get()
         tel = self.entry_tel_cliente.get()
@@ -649,7 +582,6 @@ class VentanaDashboard(ctk.CTk):
             messagebox.showwarning("Atención", "Selecciona un cliente de la tabla primero.")
             return
             
-        # Pregunta de confirmación antes de borrar
         respuesta = messagebox.askyesno("Confirmar Eliminación", f"¿Estás totalmente seguro de eliminar al cliente con documento {doc}?")
         if respuesta:
             exito, mensaje = Cliente.eliminar(doc)
@@ -659,12 +591,7 @@ class VentanaDashboard(ctk.CTk):
                 self.cargar_tabla_clientes()
             else:
                 messagebox.showerror("Bloqueo", mensaje)
-    # ========================================================= 
     
-    # --- FUNCIONES PARA GESTIÓN DE USUARIOS ---
-    # =========================================================
-    # --- FUNCIONES PARA GESTIÓN DE USUARIOS (FASE 4 - CRUD) ---
-    # =========================================================
     def mostrar_usuarios(self):
         self.limpiar_main_frame()
         
@@ -688,7 +615,6 @@ class VentanaDashboard(ctk.CTk):
         self.entry_clave_user = ctk.CTkEntry(frame_form, width=250, placeholder_text="Contraseña (Déjala vacía si no la vas a cambiar)", show="*")
         self.entry_clave_user.grid(row=1, column=1, padx=10, pady=10)
 
-        # --- BOTONES DE ACCIÓN (CRUD) ---
         frame_botones = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_botones.pack(pady=10)
 
@@ -697,7 +623,6 @@ class VentanaDashboard(ctk.CTk):
         ctk.CTkButton(frame_botones, text="🗑️ Eliminar", fg_color="#7a2424", hover_color="#5c1a1a", width=120, command=self.eliminar_usuario_gui).grid(row=0, column=2, padx=5)
         ctk.CTkButton(frame_botones, text="🧹 Limpiar", fg_color="gray", width=120, command=self.limpiar_form_usuario).grid(row=0, column=3, padx=5)
 
-        # --- TABLA DE USUARIOS ---
         from tkinter import ttk
         style = ttk.Style()
         style.theme_use("default")
@@ -804,7 +729,7 @@ class VentanaDashboard(ctk.CTk):
 
     def eliminar_usuario_gui(self):
         from main import Usuario
-        from tkinter import simpledialog # Importamos la ventana de contraseña
+        from tkinter import simpledialog 
         
         doc = self.entry_doc_user.get()
         nom = self.entry_nom_user.get()
@@ -814,22 +739,19 @@ class VentanaDashboard(ctk.CTk):
             messagebox.showwarning("Atención", "Selecciona un usuario de la tabla.")
             return
 
-        # 🛡️ EL CANDADO DE SEGURIDAD PARA ADMINISTRADORES
         if rol_texto == "Administrador":
-            # Abre una ventanita pidiendo la clave (los caracteres se ocultan con '*')
             clave_seguridad = simpledialog.askstring("Verificación Requerida", 
                                                      f"Para eliminar al administrador '{nom}', ingresa la contraseña de ESE administrador:", 
                                                      show='*')
             
-            if not clave_seguridad: # Si el usuario le dio a "Cancelar" o la dejó en blanco
+            if not clave_seguridad: 
                 return
                 
-            # Llamamos al backend para ver si la clave coincide
+            
             if not Usuario.autenticar(doc, clave_seguridad):
                 messagebox.showerror("Acceso Denegado", "Contraseña incorrecta. Operación bloqueada.")
                 return
 
-        # Si no era administrador, o si sí era y puso la clave correcta, procedemos a borrar:
         respuesta = messagebox.askyesno("Confirmar", f"¿Eliminar permanentemente la cuenta de {nom}?")
         if respuesta:
             exito, mensaje = Usuario.eliminar(doc)
@@ -839,23 +761,16 @@ class VentanaDashboard(ctk.CTk):
                 self.cargar_tabla_usuarios()
             else:
                 messagebox.showerror("Bloqueo del Sistema", mensaje)
-    # =========================================================
-            
-    # --- FUNCIONES PARA VENDER MEMBRESÍAS ---
-    # =========================================================
-    # --- FUNCIONES PARA VENDER MEMBRESÍAS (FASE 5 - CRUD) ---
-    # =========================================================
+    
     def mostrar_membresias(self):
         self.limpiar_main_frame()
         
         lbl_titulo = ctk.CTkLabel(self.main_frame, text="🎟️ Gestión de Membresías", font=("Roboto", 24, "bold"))
         lbl_titulo.pack(pady=(20, 10))
 
-        # --- FORMULARIO ---
         frame_form = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_form.pack(pady=10)
 
-        # Campo oculto/bloqueado para el ID de la membresía
         self.entry_id_mem = ctk.CTkEntry(frame_form, width=80, placeholder_text="ID")
         self.entry_id_mem.grid(row=0, column=0, padx=5, pady=10)
         self.entry_id_mem.configure(state="disabled")
@@ -871,7 +786,6 @@ class VentanaDashboard(ctk.CTk):
         self.combo_plan.grid(row=0, column=2, padx=10, pady=10)
         self.combo_plan.set("Plan Mensual (30 días)")
 
-        # --- BOTONES DE ACCIÓN (CRUD) ---
         frame_botones = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_botones.pack(pady=10)
 
@@ -880,7 +794,6 @@ class VentanaDashboard(ctk.CTk):
         ctk.CTkButton(frame_botones, text="🗑️ Eliminar", fg_color="#7a2424", hover_color="#5c1a1a", width=120, command=self.eliminar_membresia_gui).grid(row=0, column=2, padx=5)
         ctk.CTkButton(frame_botones, text="🧹 Limpiar", fg_color="gray", width=120, command=self.limpiar_form_membresia).grid(row=0, column=3, padx=5)
 
-        # --- TABLA DE MEMBRESÍAS ---
         from tkinter import ttk
         style = ttk.Style()
         style.theme_use("default")
@@ -933,12 +846,10 @@ class VentanaDashboard(ctk.CTk):
             
             self.entry_id_mem.insert(0, str(datos[0]))
             self.entry_doc_membresia.insert(0, str(datos[1]))
-            # Seleccionamos el plan en el combo basado en el texto de la tabla
             if "Mensual" in str(datos[3]): self.combo_plan.set("Plan Mensual (30 días)")
             elif "Trimestral" in str(datos[3]): self.combo_plan.set("Plan Trimestral (90 días)")
             elif "Anual" in str(datos[3]): self.combo_plan.set("Plan Anual (365 días)")
             
-            # Bloqueamos ID y Documento para que no los cambien por error
             self.entry_id_mem.configure(state="disabled")
             self.entry_doc_membresia.configure(state="disabled")
 
@@ -1015,19 +926,13 @@ class VentanaDashboard(ctk.CTk):
                 self.cargar_tabla_membresias()
             else:
                 messagebox.showerror("Error", mensaje)
-    # =========================================================
-            
-    # --- FUNCIONES PARA GESTIÓN DE INVENTARIO ---
-    # =========================================================
-    # --- FUNCIONES PARA GESTIÓN DE INVENTARIO (FASE 6 - CRUD) ---
-    # =========================================================
+    
     def mostrar_inventario(self):
         self.limpiar_main_frame()
         
         lbl_titulo = ctk.CTkLabel(self.main_frame, text="📦 Gestión de Inventario", font=("Roboto", 24, "bold"))
         lbl_titulo.pack(pady=(20, 10))
 
-        # --- FORMULARIO ---
         frame_form = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_form.pack(pady=10)
 
@@ -1043,7 +948,6 @@ class VentanaDashboard(ctk.CTk):
         self.inv_stock = ctk.CTkEntry(frame_form, width=200, placeholder_text="Stock Disponible")
         self.inv_stock.grid(row=1, column=1, padx=10, pady=10)
 
-        # --- BOTONES DE ACCIÓN (CRUD) ---
         frame_botones = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_botones.pack(pady=10)
 
@@ -1052,7 +956,6 @@ class VentanaDashboard(ctk.CTk):
         ctk.CTkButton(frame_botones, text="🗑️ Eliminar", fg_color="#7a2424", hover_color="#5c1a1a", width=120, command=self.eliminar_producto_gui).grid(row=0, column=2, padx=5)
         ctk.CTkButton(frame_botones, text="🧹 Limpiar", fg_color="gray", width=120, command=self.limpiar_form_inventario).grid(row=0, column=3, padx=5)
 
-        # --- TABLA DE INVENTARIO ---
         from tkinter import ttk
         style = ttk.Style()
         style.theme_use("default")
@@ -1091,7 +994,6 @@ class VentanaDashboard(ctk.CTk):
         exito, productos = Producto.obtener_todos()
         if exito:
             for prod in productos:
-                # El backend devuelve: (codigo, nombre, precio, stock)
                 self.tabla_inventario.insert("", "end", values=(prod[0], prod[1], prod[2], prod[3]))
 
     def seleccionar_producto_inv(self, event):
@@ -1105,7 +1007,6 @@ class VentanaDashboard(ctk.CTk):
             
             self.inv_codigo.insert(0, str(datos[0]))
             self.inv_nombre.insert(0, str(datos[1]))
-            # Limpiamos el símbolo de dólar o comas si llegaran a estar en la tabla
             precio_limpio = str(datos[2]).replace("$", "").replace(",", "")
             self.inv_precio.insert(0, precio_limpio)
             self.inv_stock.insert(0, str(datos[3]))
@@ -1189,16 +1090,13 @@ class VentanaDashboard(ctk.CTk):
             else:
                 messagebox.showerror("Error", mensaje)
             
-    # =========================================================
-    # --- FUNCIONES PARA GESTIÓN DE PLANES (FASE 8 - CRUD) ---
-    # =========================================================
+    
     def mostrar_planes(self):
         self.limpiar_main_frame()
         
         lbl_titulo = ctk.CTkLabel(self.main_frame, text="📋 Configuración de Planes y Precios", font=("Roboto", 24, "bold"))
         lbl_titulo.pack(pady=(20, 10))
 
-        # --- FORMULARIO ---
         frame_form = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_form.pack(pady=10)
 
@@ -1215,7 +1113,6 @@ class VentanaDashboard(ctk.CTk):
         self.plan_precio = ctk.CTkEntry(frame_form, width=150, placeholder_text="Precio Total ($)")
         self.plan_precio.grid(row=0, column=3, padx=10, pady=10)
 
-        # --- BOTONES DE ACCIÓN (CRUD) ---
         frame_botones = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_botones.pack(pady=10)
 
@@ -1224,7 +1121,6 @@ class VentanaDashboard(ctk.CTk):
         ctk.CTkButton(frame_botones, text="🗑️ Eliminar", fg_color="#7a2424", hover_color="#5c1a1a", width=120, command=self.eliminar_plan_gui).grid(row=0, column=2, padx=5)
         ctk.CTkButton(frame_botones, text="🧹 Limpiar", fg_color="gray", width=120, command=self.limpiar_form_plan).grid(row=0, column=3, padx=5)
 
-        # --- TABLA DE PLANES ---
         from tkinter import ttk
         style = ttk.Style()
         style.theme_use("default")
@@ -1271,19 +1167,13 @@ class VentanaDashboard(ctk.CTk):
             item = self.tabla_planes.item(seleccion[0])
             datos = item['values']
             
-            # 1. Limpiamos y dejamos el candado abierto (True)
             self.limpiar_form_plan(desbloquear=True)
             
-            # 2. Escribimos todos los datos (ahora sí nos dejará escribir el ID)
             self.plan_id.insert(0, str(datos[0]))
             self.plan_nombre.insert(0, str(datos[1]))
             self.plan_dias.insert(0, str(datos[2]))
-            
-            # Limpiamos los símbolos de moneda por si acaso
             precio_limpio = str(datos[3]).replace("$", "").replace(",", "")
             self.plan_precio.insert(0, precio_limpio)
-            
-            # 3. Volvemos a cerrar el candado del ID para protegerlo
             self.plan_id.configure(state="disabled")
 
     def limpiar_form_plan(self, desbloquear=True):
@@ -1368,7 +1258,6 @@ class VentanaDashboard(ctk.CTk):
                 self.cargar_tabla_planes()
             else:
                 messagebox.showerror("Error", mensaje)
-    # =========================================================
    
             
     

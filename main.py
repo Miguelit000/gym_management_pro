@@ -50,7 +50,6 @@ class Usuario:
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
-            # Traemos el texto del rol en lugar del número para que la tabla se vea profesional
             cursor.execute("""
                 SELECT documento, nombre, 
                        CASE WHEN id_rol = 2 THEN 'Administrador' ELSE 'Recepcionista' END as rol 
@@ -67,7 +66,6 @@ class Usuario:
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
-            # Si el usuario escribió una clave nueva en la casilla, la encriptamos y la cambiamos
             if clave_nueva != "":
                 import hashlib
                 clave_hash = hashlib.sha256(clave_nueva.encode()).hexdigest()
@@ -75,7 +73,6 @@ class Usuario:
                     "UPDATE Usuario SET nombre = ?, id_rol = ?, clave_hash = ? WHERE documento = ?",
                     (nombre, id_rol, clave_hash, documento)
                 )
-            # Si dejó la casilla vacía, solo actualizamos el nombre y el rol (dejamos la clave intacta)
             else:
                 cursor.execute(
                     "UPDATE Usuario SET nombre = ?, id_rol = ? WHERE documento = ?",
@@ -109,13 +106,12 @@ class Usuario:
         clave_hash = hashlib.sha256(clave.encode()).hexdigest()
         conexion = conectar_db()
         cursor = conexion.cursor()
-        
-        # Traemos explícitamente el id_usuario, id_rol y nombre
+    
         cursor.execute("SELECT id_usuario, id_rol, nombre FROM Usuario WHERE documento = ? AND clave_hash = ?", (documento, clave_hash))
         usuario = cursor.fetchone()
         conexion.close()
         
-        return usuario # Devolverá (id_usuario, id_rol, nombre) o None
+        return usuario 
 
 class Plan:
     def __init__(self, nombre, dias_duracion, precio_base, id_plan=None):
@@ -255,7 +251,6 @@ class Cliente:
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
-            # Intentamos borrar. Si tiene membresías compradas, SQLite lo impedirá por seguridad.
             cursor.execute("DELETE FROM Cliente WHERE documento = ?", (documento,))
             conexion.commit()
             return True, "Cliente eliminado del sistema."
@@ -292,7 +287,6 @@ class Membresia:
     @staticmethod
     def crear_nueva(id_cliente, id_plan, dias_duracion):
         fecha_inicio = date.today()
-        # Calculamos la fecha de vencimiento sumando los días al día de hoy
         fecha_fin = fecha_inicio + timedelta(days=dias_duracion)
         
         nueva_membresia = Membresia(id_cliente, id_plan, fecha_inicio, fecha_fin)
@@ -338,7 +332,6 @@ class Membresia:
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
-            # Unimos 3 tablas para traer el nombre del cliente y el nombre del plan
             cursor.execute('''
                 SELECT m.id_membresia, c.documento, c.nombre, p.nombre, m.fecha_fin
                 FROM Membresia m
@@ -357,7 +350,6 @@ class Membresia:
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
-            # Buscamos la fecha de inicio original para recalcular el nuevo vencimiento
             cursor.execute("SELECT fecha_inicio FROM Membresia WHERE id_membresia = ?", (id_membresia,))
             resultado = cursor.fetchone()
             if not resultado:
@@ -637,21 +629,15 @@ class Dashboard:
         total_ingresos = total_gastos = total_anulaciones = 0.0
         
         try: 
-            # 1. Armamos el filtro según lo que pidió el usuario
             if periodo == "TODO":
                 filtro = ""
                 parametros = ()
             else:
                 if not periodo:
-                    # Si no envían nada, agarramos el mes y año actual automáticamente
                     periodo = datetime.now().strftime('%Y-%m')
-                
-                # Asumimos que la columna en tu BD se llama 'fecha' o 'fecha_hora'
-                # El comando LIKE busca todo lo que empiece con ese Año-Mes
                 filtro = " AND fecha LIKE ?" 
                 parametros = (f"{periodo}%",)
 
-            # 2. Hacemos las sumas aplicando el filtro
             cursor.execute(f"SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Ingreso'{filtro}", parametros)
             fila = cursor.fetchone()
             if fila: total_ingresos = fila[0]
@@ -675,7 +661,6 @@ class Dashboard:
             return True, datos
             
         except Exception as e:
-            # Si da error por el nombre de la columna, el usuario sabrá qué ajustar
             return False, f"Error BD: Verifica que la columna de fecha se llame 'fecha' (Detalle: {e})"
         finally:
             conexion.close()
@@ -685,7 +670,6 @@ class Dashboard:
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
-            # Guardamos el gasto como un valor negativo para que la suma del reporte cuadre perfecta
             monto_negativo = -abs(monto)
             cursor.execute(
                 "INSERT INTO Transaccion (id_usuario, tipo, monto, descripcion) VALUES (?, 'Gasto', ?, ?)",
@@ -711,7 +695,6 @@ class Configuracion:
                 ruta_logo TEXT
             )
         ''')
-        # Si la tabla está vacía, insertamos la fila por defecto
         cursor.execute("INSERT OR IGNORE INTO Configuracion (id, nombre_gym, ruta_logo) VALUES (1, 'Gym Pro', '')")
         conexion.commit()
         conexion.close()
