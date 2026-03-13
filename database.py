@@ -1,10 +1,25 @@
+"""
+=============================================================================
+Gym Management Pro - Estructura de Base de Datos (database.py)
+Autor: Miguelit000
+Descripción: Este script es el "Arquitecto" del sistema. Se ejecuta una sola 
+vez al principio (o si se borra la base de datos) para construir todas las 
+tablas y relaciones (Llaves Foráneas) necesarias en SQLite.
+=============================================================================
+"""
+
 import sqlite3
 
 def crear_base_datos():
+    """Genera el archivo físico gym_pro.db y construye las 8 tablas fundamentales del sistema."""
     
+    # Conecta o crea el archivo de la base de datos
     conexion = sqlite3.connect("gym_pro.db")
     cursor = conexion.cursor()
     
+    # ---------------------------------------------------------
+    # 1. TABLA: ROL (Niveles de acceso al sistema)
+    # ---------------------------------------------------------
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS Rol (
                 id_rol INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -12,17 +27,23 @@ def crear_base_datos():
                 )
             ''')
     
+    # ---------------------------------------------------------
+    # 2. TABLA: USUARIO (Empleados, Recepcionistas, Administradores)
+    # ---------------------------------------------------------
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS Usuario (
                 id_usuario INTEGER PRIMARY KEY AUTOINCREMENT, 
                 id_rol INTEGER,
                 documento TEXT NOT NULL UNIQUE,
                 nombre TEXT NOT NULL,
-                clave_hash TEXT NOT NULL,
+                clave_hash TEXT NOT NULL, -- La contraseña va encriptada por seguridad
                 FOREIGN KEY (id_rol) REFERENCES Rol(id_rol)
                 )
             ''')
     
+    # ---------------------------------------------------------
+    # 3. TABLA: CLIENTE (Personas inscritas en el gimnasio)
+    # ---------------------------------------------------------
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS Cliente (
                 id_cliente INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,6 +54,9 @@ def crear_base_datos():
                 )
             ''')
     
+    # ---------------------------------------------------------
+    # 4. TABLA: PLAN (Catálogo de membresías que se venden)
+    # ---------------------------------------------------------
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS Plan (
                 id_plan INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,6 +66,9 @@ def crear_base_datos():
                 )
             ''')
     
+    # ---------------------------------------------------------
+    # 5. TABLA: MEMBRESÍA (El registro de qué plan compró un cliente y cuándo vence)
+    # ---------------------------------------------------------
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS Membresia (
                 id_membresia INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -54,11 +81,14 @@ def crear_base_datos():
                 )
             ''')
     
+    # ---------------------------------------------------------
+    # 6. TABLA: TRANSACCIÓN (Libro de contabilidad: Ingresos, Gastos y Anulaciones)
+    # ---------------------------------------------------------
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS Transaccion (
                 id_transaccion INTEGER PRIMARY KEY AUTOINCREMENT,
-                id_usuario INTEGER,
-                tipo TEXT NOT NULL, -- 'Ingreso', 'Gasto', 'Anulacion'
+                id_usuario INTEGER, -- Quién registró el movimiento en caja
+                tipo TEXT NOT NULL, -- Puede ser: 'Ingreso', 'Gasto', 'Anulacion'
                 monto REAL NOT NULL,
                 descripcion TEXT,
                 fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -66,6 +96,9 @@ def crear_base_datos():
                 )
             ''')
     
+    # ---------------------------------------------------------
+    # 7. TABLA: AUDITORÍA (Historial de seguridad para rastrear fraudes o errores)
+    # ---------------------------------------------------------
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS Auditoria (
                 id_auditoria INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,6 +113,9 @@ def crear_base_datos():
                 )
             ''')
     
+    # ---------------------------------------------------------
+    # 8. TABLA: PRODUCTO (Catálogo de artículos físicos para el Punto de Venta)
+    # ---------------------------------------------------------
     cursor.execute('''
             CREATE TABLE IF NOT EXISTS Producto (
                 id_producto INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,10 +126,14 @@ def crear_base_datos():
                 )
             ''')
     
+    # Guarda los cambios y cierra el constructor
     conexion.commit()
     conexion.close()
-    print("Base de datos 'gym_pro.db' creada con exito")
+    print("Base de datos 'gym_pro.db' verificada y estructurada con éxito")
     
+# =========================================================
+# --- PUNTO DE EJECUCIÓN ---
+# Si corres este archivo directamente, construirá la base de datos
+# =========================================================
 if __name__ == "__main__":
     crear_base_datos()
-    

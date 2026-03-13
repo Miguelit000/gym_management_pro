@@ -1,24 +1,41 @@
+"""
+=============================================================================
+Gym Management Pro - Backend (main.py)
+Autor: Miguelit000
+Descripción: Este archivo contiene toda la lógica de negocio y la conexión 
+a la base de datos SQLite. Gestiona usuarios, clientes, planes, inventario, 
+membresías, accesos y la contabilidad del gimnasio.
+=============================================================================
+"""
+
 import sqlite3
 import hashlib
 from datetime import datetime, timedelta, date
 
+# ==========================================
+# CONFIGURACIÓN DE BASE DE DATOS
+# ==========================================
 def conectar_db():
+    """Establece la conexión con la base de datos y activa las llaves foráneas para seguridad."""
     conexion = sqlite3.connect("gym_pro.db")
     conexion.execute("PRAGMA foreign_keys = ON;")
     return conexion
 
 def inicializar_roles():
+    """Crea los roles básicos del sistema si aún no existen."""
     conexion = conectar_db()
     cursor = conexion.cursor()
-    
     roles_por_defecto = [("Socio",), ("Administrador",), ("Recepcionista",)]
-    
     cursor.executemany("INSERT OR IGNORE INTO Rol (nombre) VALUES (?)", roles_por_defecto)
-    
     conexion.commit()
     conexion.close()
-    
+
+# ==========================================
+# MÓDULO 1: GESTIÓN DE EQUIPO (USUARIOS)
+# ==========================================
 class Usuario:
+    """Maneja a los empleados del sistema (Administradores y Recepcionistas)."""
+    
     def __init__(self, id_rol, documento, nombre, clave):
         self.id_rol = id_rol
         self.documento = documento
@@ -26,12 +43,13 @@ class Usuario:
         self.clave_hash = self._encriptar_clave(clave)
     
     def _encriptar_clave(self, clave):
+        """Convierte la contraseña en un código seguro e irreversible (Hash)."""
         return hashlib.sha256(clave.encode()).hexdigest()
     
     def registrar(self):
+        """Guarda un nuevo empleado en la base de datos."""
         conexion = conectar_db()
         cursor = conexion.cursor()
-        
         try:
             cursor.execute(
                 "INSERT INTO Usuario (id_rol, documento, nombre, clave_hash) VALUES (?,?,?,?)",
@@ -39,17 +57,18 @@ class Usuario:
             )
             conexion.commit()
             return True, f"Éxito: Usuario '{self.nombre}' registrado correctamente."
-            
         except sqlite3.IntegrityError:
             return False, f"Error: El documento '{self.documento}' ya está registrado."
-            
         finally:
             conexion.close()
+
     @staticmethod
     def obtener_todos():
+        """Obtiene la lista de empleados para mostrar en la tabla visual."""
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
+            # Traduce el número de rol a texto (Admin/Recepcionista)
             cursor.execute("""
                 SELECT documento, nombre, 
                        CASE WHEN id_rol = 2 THEN 'Administrador' ELSE 'Recepcionista' END as rol 
@@ -63,6 +82,7 @@ class Usuario:
 
     @staticmethod
     def actualizar(documento, nombre, id_rol, clave_nueva=""):
+        """Modifica los datos de un empleado. Actualiza la clave solo si se escribe una nueva."""
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
@@ -87,6 +107,7 @@ class Usuario:
 
     @staticmethod
     def eliminar(documento):
+        """Borra un empleado permanentemente si no tiene transacciones asociadas."""
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
@@ -102,18 +123,22 @@ class Usuario:
             
     @staticmethod
     def autenticar(documento, clave):
+        """Verifica las credenciales para el inicio de sesión y permisos especiales."""
         import hashlib
         clave_hash = hashlib.sha256(clave.encode()).hexdigest()
         conexion = conectar_db()
         cursor = conexion.cursor()
-    
         cursor.execute("SELECT id_usuario, id_rol, nombre FROM Usuario WHERE documento = ? AND clave_hash = ?", (documento, clave_hash))
         usuario = cursor.fetchone()
         conexion.close()
-        
         return usuario 
 
+# ==========================================
+# MÓDULO 2: CATÁLOGO DE PLANES
+# ==========================================
 class Plan:
+    """Maneja el catálogo de planes que el gimnasio ofrece (Mensual, Anual, etc.)."""
+    
     def __init__(self, nombre, dias_duracion, precio_base, id_plan=None):
         self.id_plan = id_plan
         self.nombre = nombre
@@ -177,8 +202,13 @@ class Plan:
             return False, f"Error al eliminar: {e}"
         finally:
             conexion.close()
-            
+
+# ==========================================
+# MÓDULO 3: GESTIÓN DE CLIENTES
+# ==========================================
 class Cliente:
+    """Maneja los datos personales de las personas inscritas en el gimnasio."""
+    
     def __init__(self, documento, nombre, telefono, email, id_cliente=None):
         self.id_cliente = id_cliente
         self.documento = documento
@@ -205,18 +235,13 @@ class Cliente:
             
     @staticmethod
     def buscar_por_documento(documento):
-        
+        """Busca un cliente específico por su ID. Útil para vender membresías o puerta."""
         conexion = conectar_db()
         cursor = conexion.cursor()
         cursor.execute("SELECT * FROM Cliente WHERE documento = ?", (documento,))
         resultado = cursor.fetchone()
         conexion.close()
-        
-        if resultado:
-            return resultado
-        else:
-            print(f"Cliente con documento {documento} no encontrado.")
-            return None
+        return resultado
         
     @staticmethod
     def obtener_todos():
@@ -260,8 +285,13 @@ class Cliente:
             return False, f"Error al eliminar: {e}"
         finally:
             conexion.close()
-        
+
+# ==========================================
+# MÓDULO 4: ASIGNACIÓN DE MEMBRESÍAS
+# ==========================================
 class Membresia:
+    """Controla los planes que han sido vendidos a los clientes y sus fechas de vencimiento."""
+    
     def __init__(self, id_cliente, id_plan, fecha_inicio, fecha_fin, id_membresia=None):
         self.id_membresia = id_membresia
         self.id_cliente = id_cliente
@@ -270,6 +300,7 @@ class Membresia:
         self.fecha_fin = fecha_fin
         
     def registrar(self):
+        """Guarda la membresía calculada en la base de datos."""
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
@@ -286,18 +317,20 @@ class Membresia:
     
     @staticmethod
     def crear_nueva(id_cliente, id_plan, dias_duracion):
+        """Calcula la fecha de vencimiento sumando los días al día de hoy."""
         fecha_inicio = date.today()
         fecha_fin = fecha_inicio + timedelta(days=dias_duracion)
-        
         nueva_membresia = Membresia(id_cliente, id_plan, fecha_inicio, fecha_fin)
         exito, mensaje = nueva_membresia.registrar()
         return exito, mensaje
     
     @staticmethod
     def verificar_estado(documento_cliente):
+        """Lógica principal de la Puerta: Verifica si el cliente puede pasar."""
         conexion = conectar_db()
         cursor = conexion.cursor()
         
+        # Trae la membresía más reciente del cliente
         cursor.execute('''
                 SELECT m.fecha_fin, c.nombre
                 FROM Membresia m
@@ -313,15 +346,16 @@ class Membresia:
             return "Bloqueado: Cliente no tiene membresias registradas."
         
         fecha_fin_str, nombre_cliente = resultado
-        
         fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d').date()
         hoy = date.today()
         
+        # Cálculo de días restantes
         dias_restantes = (fecha_fin - hoy).days
         
+        # Semáforo de acceso
         if dias_restantes >= 0:
-            return F"Acceso Permitido: {nombre_cliente}. Plan vigente ({dias_restantes} dias restantes)."
-        elif dias_restantes >= 3:
+            return f"Acceso Permitido: {nombre_cliente}. Plan vigente ({dias_restantes} dias restantes)."
+        elif dias_restantes >= -3: # PERÍODO DE GRACIA (Hasta 3 días vencido)
             dias_vencidos = abs(dias_restantes)
             return f"Acceso en gracia: {nombre_cliente}. Vencio hace {dias_vencidos} dia(s). Recuerda pagar en recepcion."
         else:
@@ -332,6 +366,7 @@ class Membresia:
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
+            # JOIN para traer textos en lugar de IDs (Nombres y Planes)
             cursor.execute('''
                 SELECT m.id_membresia, c.documento, c.nombre, p.nombre, m.fecha_fin
                 FROM Membresia m
@@ -347,6 +382,7 @@ class Membresia:
 
     @staticmethod
     def actualizar(id_membresia, id_plan, dias_duracion):
+        """Recalcula el vencimiento basado en la nueva duración asignada."""
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
@@ -356,7 +392,6 @@ class Membresia:
                 return False, "Membresía no encontrada."
                 
             fecha_inicio_str = resultado[0]
-            from datetime import datetime, timedelta
             fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
             nueva_fecha_fin = fecha_inicio + timedelta(days=dias_duracion)
 
@@ -383,11 +418,16 @@ class Membresia:
             return False, f"Error al eliminar: {e}"
         finally:
             conexion.close()
-        
-class  Transaccion:
+
+# ==========================================
+# MÓDULO 5: CONTABILIDAD Y AUDITORÍA
+# ==========================================
+class Transaccion:
+    """Libro contable del sistema. Registra cualquier movimiento de dinero."""
+    
     def __init__(self, id_usuario, tipo, monto, descripcion):
         self.id_usuario = id_usuario
-        self.tipo = tipo
+        self.tipo = tipo # "Ingreso", "Gasto" o "Anulacion"
         self.monto = monto
         self.descripcion = descripcion
         
@@ -401,7 +441,6 @@ class  Transaccion:
             )
             conexion.commit()
             id_tx = cursor.lastrowid
-            print(f"Transaccion #{id_tx} registrada: {self.tipo} por ${self.monto:,.2f}. (Cajero ID: {self.id_usuario})")
             return id_tx
         except Exception as e:
             print(f"Error al registrar transaccion: {e}")
@@ -410,19 +449,16 @@ class  Transaccion:
             
     @staticmethod
     def anular(id_transaccion_original, id_usuario_anula, motivo):
+        """Genera una contra-transacción para cuadrar caja sin borrar el historial original."""
         conexion = conectar_db()
         cursor = conexion.cursor()
-        
         try:
             cursor.execute("SELECT monto, descripcion FROM Transaccion WHERE id_transaccion = ?", (id_transaccion_original,))
             original = cursor.fetchone()
-            
             if not original:
-                print("Error: La transaccion original no existe.")
                 return
             
             monto_original, desc_original = original
-            
             monto_anulacion = -monto_original
             desc_anulacion = f"ANULACION de Tx #{id_transaccion_original}: {motivo}"
             
@@ -430,26 +466,22 @@ class  Transaccion:
                 "INSERT INTO Transaccion (id_usuario, tipo, monto, descripcion) VALUES (?, 'Anulacion', ?,?)",
                 (id_usuario_anula, monto_anulacion, desc_anulacion)
             )
-            nueva_tx_id = cursor.lastrowid
-            
-            cursor.execute(
-                "INSERT INTO Auditoria (id_usuario, accion, tabla_afectada, registro_id, valor_anterior, valor_nuevo) VALUES (?,?,?,?,?,?)",
-                (id_usuario_anula, "ANULAR_TRANSACCION", "Transaccion", id_transaccion_original, str(monto_original), str(monto_anulacion))
-            )
-            
             conexion.commit()
-            print(f"¡ALERTA! Transaccion #{id_transaccion_original} fue ANULADA. Se genero la Tx #{nueva_tx_id} por ${monto_anulacion:,.2f}")
         except Exception as e:
             conexion.rollback()
-            print(f"Error critico en la anulacion: {e}")
         finally:
             conexion.close()
-            
+
+# ==========================================
+# MÓDULO 6: CONTROL DE ACCESO
+# ==========================================
 class Asistencia:
+    """Guarda el historial de las veces que los clientes cruzan la puerta."""
+    
     @staticmethod
     def registrar_entrada(documento):
+        """Verifica la membresía y guarda el registro de la visita."""
         cliente = Cliente.buscar_por_documento(documento)
-        
         if not cliente:
             return False, "ALERTA: Tarjeta o documento no reconocido en el sistema."
         
@@ -468,6 +500,8 @@ class Asistencia:
             
         conexion = conectar_db()
         cursor = conexion.cursor()
+        
+        # Crea la tabla si por alguna razón no se había creado en el script principal
         cursor.execute('''
                 CREATE TABLE IF NOT EXISTS Asistencia (
                     id_asistencia INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -477,18 +511,21 @@ class Asistencia:
                     FOREIGN KEY (id_cliente) REFERENCES Cliente(id_cliente)
                     )
                 ''')
-            
         try:
             cursor.execute("INSERT INTO Asistencia (id_cliente, estado_acceso) VALUES (?,?)", (id_cliente, estado_bd))
             conexion.commit()
             return acceso_concedido, estado_mensaje
-            
         except Exception as e:
             return False, f"Error al guardar el registro de asistencia: {e}"
         finally:
             conexion.close()
-    
+
+# ==========================================
+# MÓDULO 7: INVENTARIO Y PUNTO DE VENTA
+# ==========================================
 class Producto:
+    """Maneja los artículos físicos que se venden en el gimnasio."""
+    
     def __init__(self, codigo, nombre, precio_venta, stock, id_producto=None):
         self.id_producto = id_producto
         self.codigo = codigo
@@ -513,6 +550,7 @@ class Producto:
             
     @staticmethod
     def vender(codigo_producto, cantidad, id_usuario_vendedor):
+        """Descuenta del inventario y registra el dinero en las transacciones (Punto de Venta)."""
         conexion = conectar_db()
         cursor = conexion.cursor()
         
@@ -525,16 +563,18 @@ class Producto:
             
             id_prod, nombre, precio, stock_actual = producto
             
+            # Validación de stock
             if stock_actual < cantidad:
                 return False, f"Alerta de Inventario: No hay suficiente stock de '{nombre}'. Disponible: {stock_actual}."
             
             total_venta = precio * cantidad
             nuevo_stock = stock_actual - cantidad
             
+            # 1. Restar el inventario
             cursor.execute("UPDATE Producto SET stock = ? WHERE id_producto = ?", (nuevo_stock, id_prod))
             
+            # 2. Sumar el dinero a la caja
             descripcion_venta = f"Venta POS: {cantidad}x {nombre}"
-            
             cursor.execute(
                 "INSERT INTO Transaccion (id_usuario, tipo, monto, descripcion) VALUES (?, 'Ingreso', ?,?)",
                 (id_usuario_vendedor, total_venta, descripcion_venta)
@@ -544,38 +584,13 @@ class Producto:
             return True, f"Venta exitosa: {cantidad}x {nombre}\nTotal: ${total_venta:,.2f}\n(Stock restante: {nuevo_stock})"
         
         except Exception as e:
-            conexion.rollback()
+            conexion.rollback() # Si algo falla, deshace la venta y el descuento de stock
             return False, f"Error crítico en la venta: {e}"
         finally:
             conexion.close()
             
     @staticmethod
-    def agregar_stock(codigo_producto, cantidad_nueva):
-        conexion = conectar_db()
-        cursor = conexion.cursor()
-        try:
-            cursor.execute("SELECT nombre, stock FROM Producto WHERE codigo = ?", (codigo_producto,))
-            resultado = cursor.fetchone()
-            
-            if not resultado:
-                return False, f"El producto con código '{codigo_producto}' no existe."
-                
-            nombre_prod, stock_actual = resultado
-            nuevo_stock = stock_actual + cantidad_nueva
-            
-            cursor.execute("UPDATE Producto SET stock = ? WHERE codigo = ?", (nuevo_stock, codigo_producto))
-            conexion.commit()
-            
-            return True, f"Stock actualizado.\nProducto: {nombre_prod}\nNuevo total en bodega: {nuevo_stock}"
-            
-        except Exception as e:
-            return False, f"Error al actualizar inventario: {e}"
-        finally:
-            conexion.close()
-            
-    @staticmethod
     def obtener_todos():
-        """Devuelve todos los productos registrados para llenar la tabla."""
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
@@ -617,11 +632,16 @@ class Producto:
             return False, f"Error al eliminar: {e}"
         finally:
             conexion.close()
-                  
+
+# ==========================================
+# MÓDULO 8: ESTADÍSTICAS FINANCIERAS
+# ==========================================
 class Dashboard:
+    """Genera la información financiera consolidada para el panel de Reportes."""
+    
     @staticmethod
     def generar_reporte_financiero(periodo=None):
-        """periodo debe ser 'YYYY-MM'. Si es None, toma el mes actual. Si es 'TODO', suma todo el histórico."""
+        """Calcula los totales de ingresos, gastos y utilidad aplicando filtros de tiempo."""
         from datetime import datetime
         conexion = conectar_db()
         cursor = conexion.cursor()
@@ -629,23 +649,28 @@ class Dashboard:
         total_ingresos = total_gastos = total_anulaciones = 0.0
         
         try: 
+            # Filtro por período (Mes/Año o Histórico completo)
             if periodo == "TODO":
                 filtro = ""
                 parametros = ()
             else:
                 if not periodo:
                     periodo = datetime.now().strftime('%Y-%m')
+                # Filtramos las transacciones usando LIKE para buscar por el mes indicado
                 filtro = " AND fecha LIKE ?" 
                 parametros = (f"{periodo}%",)
 
+            # Sumatoria de Ingresos
             cursor.execute(f"SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Ingreso'{filtro}", parametros)
             fila = cursor.fetchone()
             if fila: total_ingresos = fila[0]
             
+            # Sumatoria de Gastos (Negativos)
             cursor.execute(f"SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Gasto'{filtro}", parametros)
             fila = cursor.fetchone()
             if fila: total_gastos = fila[0]
             
+            # Sumatoria de Anulaciones
             cursor.execute(f"SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Anulacion'{filtro}", parametros)
             fila = cursor.fetchone()
             if fila: total_anulaciones = fila[0]
@@ -667,10 +692,11 @@ class Dashboard:
     
     @staticmethod
     def registrar_gasto(monto, descripcion, id_usuario):
+        """Registra salidas de dinero (pagos, mantenimiento, etc.) forzando valores negativos."""
         conexion = conectar_db()
         cursor = conexion.cursor()
         try:
-            monto_negativo = -abs(monto)
+            monto_negativo = -abs(monto) # Asegura que el valor sea matemáticamente negativo
             cursor.execute(
                 "INSERT INTO Transaccion (id_usuario, tipo, monto, descripcion) VALUES (?, 'Gasto', ?, ?)",
                 (id_usuario, monto_negativo, descripcion)
@@ -681,11 +707,16 @@ class Dashboard:
             return False, f"Error al registrar el gasto: {e}"
         finally:
             conexion.close()
-            
+
+# ==========================================
+# MÓDULO 9: CONFIGURACIÓN GENERAL
+# ==========================================
 class Configuracion:
+    """Memoria de personalización del sistema (Logo y Nombre del gimnasio)."""
+    
     @staticmethod
     def inicializar():
-        """Crea la tabla de configuración si no existe y pone valores por defecto."""
+        """Crea la tabla de configuración (solo si no existe) para guardar el logo."""
         conexion = conectar_db()
         cursor = conexion.cursor()
         cursor.execute('''
@@ -695,13 +726,14 @@ class Configuracion:
                 ruta_logo TEXT
             )
         ''')
+        # Inyecta los valores por defecto la primera vez que arranca el sistema
         cursor.execute("INSERT OR IGNORE INTO Configuracion (id, nombre_gym, ruta_logo) VALUES (1, 'Gym Pro', '')")
         conexion.commit()
         conexion.close()
 
     @staticmethod
     def cargar():
-        """Trae el nombre y la ruta del logo guardados."""
+        """Devuelve el nombre y la imagen que el usuario haya guardado."""
         Configuracion.inicializar()
         conexion = conectar_db()
         cursor = conexion.cursor()
@@ -712,7 +744,7 @@ class Configuracion:
 
     @staticmethod
     def guardar(nombre_gym, ruta_logo):
-        """Actualiza la configuración permanentemente."""
+        """Sobrescribe la configuración anterior con los nuevos datos."""
         Configuracion.inicializar()
         conexion = conectar_db()
         cursor = conexion.cursor()
