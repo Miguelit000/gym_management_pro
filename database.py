@@ -9,6 +9,7 @@ tablas y relaciones (Llaves Foráneas) necesarias en SQLite.
 """
 
 import sqlite3
+import hashlib
 
 def crear_base_datos():
     """Genera el archivo físico gym_pro.db y construye las 8 tablas fundamentales del sistema."""
@@ -125,6 +126,21 @@ def crear_base_datos():
                 stock INTEGER NOT NULL DEFAULT 0
                 )
             ''')
+    
+    # ---------------------------------------------------------
+    # 9. Admin: Inyeccion de datos del usuario predeterminado
+    # ---------------------------------------------------------
+    # 1. insertar los roles (IGNORA si ya existen)
+    roles_por_defecto = [("Socio",), ("Administrador",), ("Recepcionista",)]
+    cursor.executemany("INSERT OR IGNORE INTO Rol (nombre) VALUES (?)", roles_por_defecto)
+    
+    #2. Insertar el administrador Maestro (Documento: 0, Clave: admin123)
+    clave_maestra_encriptada = hashlib.sha256("admin123".encode()).hexdigest()
+    cursor.execute('''
+            INSERT OR IGNORE INTO Usuario (id_rol, documento, nombre, clave_hash)
+            VALUES (2, '0', 'Administrado Maestro', ?)
+            ''', (clave_maestra_encriptada,))
+    
     
     # Guarda los cambios y cierra el constructor
     conexion.commit()

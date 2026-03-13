@@ -1343,5 +1343,8 @@ class VentanaDashboard(ctk.CTk):
 # --- EJECUCIÓN DEL PROGRAMA ---
 # =========================================================
 if __name__ == "__main__":
+    from database import crear_base_datos
+    crear_base_datos()
+    
     app = VentanaLogin()
     app.mainloop()
