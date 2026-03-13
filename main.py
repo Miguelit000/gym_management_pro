@@ -45,6 +45,63 @@ class Usuario:
             
         finally:
             conexion.close()
+    @staticmethod
+    def obtener_todos():
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            # Traemos el texto del rol en lugar del número para que la tabla se vea profesional
+            cursor.execute("""
+                SELECT documento, nombre, 
+                       CASE WHEN id_rol = 2 THEN 'Administrador' ELSE 'Recepcionista' END as rol 
+                FROM Usuario
+            """)
+            return True, cursor.fetchall()
+        except Exception as e:
+            return False, f"Error al cargar usuarios: {e}"
+        finally:
+            conexion.close()
+
+    @staticmethod
+    def actualizar(documento, nombre, id_rol, clave_nueva=""):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            # Si el usuario escribió una clave nueva en la casilla, la encriptamos y la cambiamos
+            if clave_nueva != "":
+                import hashlib
+                clave_hash = hashlib.sha256(clave_nueva.encode()).hexdigest()
+                cursor.execute(
+                    "UPDATE Usuario SET nombre = ?, id_rol = ?, clave_hash = ? WHERE documento = ?",
+                    (nombre, id_rol, clave_hash, documento)
+                )
+            # Si dejó la casilla vacía, solo actualizamos el nombre y el rol (dejamos la clave intacta)
+            else:
+                cursor.execute(
+                    "UPDATE Usuario SET nombre = ?, id_rol = ? WHERE documento = ?",
+                    (nombre, id_rol, documento)
+                )
+            conexion.commit()
+            return True, "Datos del usuario actualizados correctamente."
+        except Exception as e:
+            return False, f"Error al actualizar: {e}"
+        finally:
+            conexion.close()
+
+    @staticmethod
+    def eliminar(documento):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute("DELETE FROM Usuario WHERE documento = ?", (documento,))
+            conexion.commit()
+            return True, "Usuario eliminado permanentemente del sistema."
+        except sqlite3.IntegrityError:
+            return False, "No se puede eliminar porque este usuario ya ha procesado ventas o gastos."
+        except Exception as e:
+            return False, f"Error al eliminar: {e}"
+        finally:
+            conexion.close()
             
     @staticmethod
     def autenticar(documento, clave):
@@ -122,6 +179,50 @@ class Cliente:
             print(f"Cliente con documento {documento} no encontrado.")
             return None
         
+    @staticmethod
+    def obtener_todos():
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute("SELECT documento, nombre, telefono, email FROM Cliente")
+            return True, cursor.fetchall()
+        except Exception as e:
+            return False, f"Error al cargar clientes: {e}"
+        finally:
+            conexion.close()
+
+    @staticmethod
+    def actualizar(documento, nombre, telefono, email):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute(
+                "UPDATE Cliente SET nombre = ?, telefono = ?, email = ? WHERE documento = ?",
+                (nombre, telefono, email, documento)
+            )
+            conexion.commit()
+            return True, "Datos del cliente actualizados correctamente."
+        except Exception as e:
+            return False, f"Error al actualizar: {e}"
+        finally:
+            conexion.close()
+
+    @staticmethod
+    def eliminar(documento):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            # Intentamos borrar. Si tiene membresías compradas, SQLite lo impedirá por seguridad.
+            cursor.execute("DELETE FROM Cliente WHERE documento = ?", (documento,))
+            conexion.commit()
+            return True, "Cliente eliminado del sistema."
+        except sqlite3.IntegrityError:
+            return False, "Bloqueo de Seguridad: No puedes eliminar a este cliente porque tiene un historial de membresías o asistencias guardado."
+        except Exception as e:
+            return False, f"Error al eliminar: {e}"
+        finally:
+            conexion.close()
+        
 class Membresia:
     def __init__(self, id_cliente, id_plan, fecha_inicio, fecha_fin, id_membresia=None):
         self.id_membresia = id_membresia
@@ -188,6 +289,65 @@ class Membresia:
             return f"Acceso en gracia: {nombre_cliente}. Vencio hace {dias_vencidos} dia(s). Recuerda pagar en recepcion."
         else:
             return f"Acceso Denegado: {nombre_cliente}. Plan vencido hace {abs(dias_restantes)} dias."
+    
+    @staticmethod
+    def obtener_todas():
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            # Unimos 3 tablas para traer el nombre del cliente y el nombre del plan
+            cursor.execute('''
+                SELECT m.id_membresia, c.documento, c.nombre, p.nombre, m.fecha_fin
+                FROM Membresia m
+                JOIN Cliente c ON m.id_cliente = c.id_cliente
+                JOIN Plan p ON m.id_plan = p.id_plan
+                ORDER BY m.id_membresia DESC
+            ''')
+            return True, cursor.fetchall()
+        except Exception as e:
+            return False, f"Error al cargar membresías: {e}"
+        finally:
+            conexion.close()
+
+    @staticmethod
+    def actualizar(id_membresia, id_plan, dias_duracion):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            # Buscamos la fecha de inicio original para recalcular el nuevo vencimiento
+            cursor.execute("SELECT fecha_inicio FROM Membresia WHERE id_membresia = ?", (id_membresia,))
+            resultado = cursor.fetchone()
+            if not resultado:
+                return False, "Membresía no encontrada."
+                
+            fecha_inicio_str = resultado[0]
+            from datetime import datetime, timedelta
+            fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d').date()
+            nueva_fecha_fin = fecha_inicio + timedelta(days=dias_duracion)
+
+            cursor.execute(
+                "UPDATE Membresia SET id_plan = ?, fecha_fin = ? WHERE id_membresia = ?", 
+                (id_plan, str(nueva_fecha_fin), id_membresia)
+            )
+            conexion.commit()
+            return True, f"Membresía actualizada. Nuevo vencimiento: {nueva_fecha_fin}"
+        except Exception as e:
+            return False, f"Error al actualizar: {e}"
+        finally:
+            conexion.close()
+
+    @staticmethod
+    def eliminar(id_membresia):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute("DELETE FROM Membresia WHERE id_membresia = ?", (id_membresia,))
+            conexion.commit()
+            return True, "Registro de membresía eliminado."
+        except Exception as e:
+            return False, f"Error al eliminar: {e}"
+        finally:
+            conexion.close()
         
 class  Transaccion:
     def __init__(self, id_usuario, tipo, monto, descripcion):
@@ -389,6 +549,37 @@ class Producto:
             return True, productos
         except Exception as e:
             return False, f"Error al cargar productos: {e}"
+        finally:
+            conexion.close()
+        
+    @staticmethod
+    def actualizar(codigo, nombre, precio_venta, stock):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute(
+                "UPDATE Producto SET nombre = ?, precio_venta = ?, stock = ? WHERE codigo = ?",
+                (nombre, precio_venta, stock, codigo)
+            )
+            conexion.commit()
+            return True, "Datos del producto actualizados correctamente."
+        except Exception as e:
+            return False, f"Error al actualizar el producto: {e}"
+        finally:
+            conexion.close()
+
+    @staticmethod
+    def eliminar(codigo):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute("DELETE FROM Producto WHERE codigo = ?", (codigo,))
+            conexion.commit()
+            return True, "Producto eliminado del inventario."
+        except sqlite3.IntegrityError:
+            return False, "Bloqueo: No puedes eliminar este producto porque ya está registrado en el historial de ventas."
+        except Exception as e:
+            return False, f"Error al eliminar: {e}"
         finally:
             conexion.close()
                   
