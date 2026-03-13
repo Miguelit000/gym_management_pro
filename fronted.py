@@ -59,7 +59,7 @@ class VentanaDashboard(ctk.CTk):
         self.id_rol = id_rol
         self.nombre_usuario = nombre_usuario
 
-        self.title("Gym Management Pro - Panel Principal")
+        self.title("Gym Management Pro - By Miguelit000")
         self.geometry("900x600")
         
         self.grid_rowconfigure(0, weight=1)
@@ -68,13 +68,29 @@ class VentanaDashboard(ctk.CTk):
         # --- MENÚ LATERAL (SIDEBAR) ---
         self.sidebar_frame = ctk.CTkFrame(self, width=220, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(10, weight=1) 
+        self.sidebar_frame.grid_rowconfigure(11, weight=1) 
+
+        # 👇 CARGAMOS LA CONFIGURACIÓN PERMANENTE 👇
+        from main import Configuracion
+        nombre_guardado, ruta_logo_guardada = Configuracion.cargar()
 
         self.logo_img_label = ctk.CTkLabel(self.sidebar_frame, text="")
         self.logo_img_label.grid(row=0, column=0, padx=20, pady=(20, 0))
 
-        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="Gym Pro", font=("Roboto", 24, "bold"))
+        # Ponemos el nombre guardado en lugar de un texto fijo
+        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text=nombre_guardado, font=("Roboto", 24, "bold"))
         self.logo_label.grid(row=1, column=0, padx=20, pady=(5, 20))
+
+        # Si hay una ruta de logo guardada, la cargamos visualmente
+        if ruta_logo_guardada and ruta_logo_guardada != "":
+            try:
+                from PIL import Image
+                imagen_pil = Image.open(ruta_logo_guardada)
+                imagen_ctk = ctk.CTkImage(light_image=imagen_pil, dark_image=imagen_pil, size=(100, 100))
+                self.logo_img_label.configure(image=imagen_ctk)
+            except Exception:
+                pass # Si por alguna razón borraste la imagen de tu PC, simplemente no la muestra
+        # 👆 FIN DE LA CARGA DE CONFIGURACIÓN 👆
 
         # Botones PÚBLICOS (Los ven tanto Admins como Recepcionistas)
         self.btn_pos = ctk.CTkButton(self.sidebar_frame, text="Punto de Venta", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_pos)
@@ -100,13 +116,18 @@ class VentanaDashboard(ctk.CTk):
             self.btn_usuarios = ctk.CTkButton(self.sidebar_frame, text="Gestión de Usuarios", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_usuarios)
             self.btn_usuarios.grid(row=8, column=0, padx=20, pady=10)
 
-            self.btn_config = ctk.CTkButton(self.sidebar_frame, text="Configuración", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_configuracion)
-            self.btn_config.grid(row=9, column=0, padx=20, pady=10)
+            # 👇 NUEVO BOTÓN DE PLANES 👇
+            self.btn_planes = ctk.CTkButton(self.sidebar_frame, text="Gestión de Planes", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_planes)
+            self.btn_planes.grid(row=9, column=0, padx=20, pady=10)
 
-        # 👇 ESTAS SON LAS PIEZAS VISUALES QUE TE FALTABAN AL FINAL 👇
+            # Bajamos configuración a la fila 10
+            self.btn_config = ctk.CTkButton(self.sidebar_frame, text="Configuración", fg_color="transparent", border_width=1, text_color=("gray10", "#DCE4EE"), command=self.mostrar_configuracion)
+            self.btn_config.grid(row=10, column=0, padx=20, pady=10)
+
+        # Info del usuario (Bajamos a la fila 11)
         rol_texto = "Administrador" if self.id_rol == 2 else "Recepcionista"
         self.lbl_usuario = ctk.CTkLabel(self.sidebar_frame, text=f"👤 {self.nombre_usuario}\n({rol_texto})")
-        self.lbl_usuario.grid(row=10, column=0, padx=20, pady=20, sticky="s")
+        self.lbl_usuario.grid(row=11, column=0, padx=20, pady=20, sticky="s")
 
         self.main_frame = ctk.CTkFrame(self, corner_radius=10)
         self.main_frame.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
@@ -270,11 +291,22 @@ class VentanaDashboard(ctk.CTk):
             messagebox.showinfo("Logo Seleccionado", "Imagen lista. Haz clic en 'Guardar Cambios' para aplicarla.")
 
     def guardar_configuracion(self):
-        """Aplica los cambios al menú lateral."""
+        """Aplica los cambios al menú lateral y los guarda en la base de datos."""
+        from main import Configuracion
+        from PIL import Image
+        
         nuevo_nombre = self.entry_nombre_gym.get()
         
-        if nuevo_nombre.strip() != "":
-            self.logo_label.configure(text=nuevo_nombre)
+        # Obtenemos los datos actuales por si el usuario dejó un campo en blanco
+        nombre_actual, logo_actual = Configuracion.cargar()
+        
+        # Si escribió algo, usamos el nuevo. Si no, dejamos el que estaba.
+        nombre_final = nuevo_nombre if nuevo_nombre.strip() != "" else nombre_actual
+        # Si seleccionó imagen, usamos la nueva. Si no, dejamos la que estaba.
+        ruta_final = self.ruta_logo_temp if self.ruta_logo_temp else logo_actual
+
+        # 1. Actualizamos la Interfaz Gráfica al instante
+        self.logo_label.configure(text=nombre_final)
             
         if self.ruta_logo_temp:
             try:
@@ -282,10 +314,18 @@ class VentanaDashboard(ctk.CTk):
                 imagen_ctk = ctk.CTkImage(light_image=imagen_pil, dark_image=imagen_pil, size=(100, 100))
                 self.logo_img_label.configure(image=imagen_ctk)
             except Exception as e:
-                messagebox.showerror("Error", f"No se pudo cargar la imagen: {e}")
-                
-        messagebox.showinfo("Éxito", "¡El sistema ha sido personalizado!")
-        self.entry_nombre_gym.delete(0, 'end') 
+                messagebox.showerror("Error", f"No se pudo cargar la imagen visualmente: {e}")
+                return
+
+        # 2. Guardamos en la Base de Datos para siempre
+        exito, mensaje = Configuracion.guardar(nombre_final, ruta_final)
+        
+        if exito:
+            messagebox.showinfo("Éxito", "¡El sistema ha sido personalizado permanentemente!")
+            self.entry_nombre_gym.delete(0, 'end')
+            self.ruta_logo_temp = None # Reseteamos la ruta temporal
+        else:
+            messagebox.showerror("Error al guardar", mensaje) 
         
             
     # --- NUEVAS FUNCIONES PARA EL CONTROL DE PUERTA ---
@@ -342,72 +382,97 @@ class VentanaDashboard(ctk.CTk):
         self.entry_doc_puerta.delete(0, 'end')
         
     # --- NUEVAS FUNCIONES PARA LOS REPORTES ---
+    # =========================================================
+    # --- FUNCIONES PARA LOS REPORTES (FASE 7 - HISTORIAL) ---
+    # =========================================================
     def mostrar_reportes(self):
-        """Consulta el backend y dibuja las tarjetas financieras y el formulario de gastos."""
+        """Dibuja la estructura base de los reportes y el filtro de fechas."""
         self.limpiar_main_frame()
         
         lbl_titulo = ctk.CTkLabel(self.main_frame, text="📊 Resumen Financiero", font=("Roboto", 24, "bold"))
         lbl_titulo.pack(pady=(20, 10))
 
-        from main import Dashboard
-        exito, datos = Dashboard.generar_reporte_financiero()
+        # --- SECCIÓN 1: FILTRO DE MESES ---
+        frame_filtros = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        frame_filtros.pack(pady=5)
 
-        if not exito:
-            messagebox.showerror("Error", f"No se pudo cargar el reporte: {datos}")
-            return
+        from datetime import datetime
+        mes_actual = datetime.now().strftime('%Y-%m')
 
-        # Tarjetas financieras
-        frame_cards = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        frame_cards.pack(pady=10, fill="x", padx=40)
-        frame_cards.grid_columnconfigure((0, 1), weight=1)
+        ctk.CTkLabel(frame_filtros, text="📅 Período:").grid(row=0, column=0, padx=10)
 
-        # 1. Ingresos
-        card_ingresos = ctk.CTkFrame(frame_cards, corner_radius=10, fg_color="#1f532b")
-        card_ingresos.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        ctk.CTkLabel(card_ingresos, text="📈 Total Ingresos", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
-        ctk.CTkLabel(card_ingresos, text=f"${datos['ingresos']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
+        # Opciones: Mes actual, meses anteriores de prueba, y "TODO"
+        self.combo_periodo = ctk.CTkComboBox(frame_filtros, values=[mes_actual, "2026-02", "2026-01", "TODO"])
+        self.combo_periodo.grid(row=0, column=1, padx=10)
+        self.combo_periodo.set(mes_actual) # Por defecto arranca en este mes
 
-        # 2. Gastos
-        card_gastos = ctk.CTkFrame(frame_cards, corner_radius=10, fg_color="#7a2424")
-        card_gastos.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
-        ctk.CTkLabel(card_gastos, text="📉 Total Gastos", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
-        ctk.CTkLabel(card_gastos, text=f"${datos['gastos']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
+        btn_filtrar = ctk.CTkButton(frame_filtros, text="🔍 Consultar", width=120, command=self.cargar_tarjetas_reporte)
+        btn_filtrar.grid(row=0, column=2, padx=10)
 
-        # 3. Anulaciones
-        card_anulaciones = ctk.CTkFrame(frame_cards, corner_radius=10, fg_color="#9c6614")
-        card_anulaciones.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
-        ctk.CTkLabel(card_anulaciones, text="⚠️ Total Anulaciones", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
-        ctk.CTkLabel(card_anulaciones, text=f"${datos['anulaciones']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
+        # --- SECCIÓN 2: CONTENEDOR DE TARJETAS (Vacío al inicio) ---
+        self.frame_cards = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.frame_cards.pack(pady=10, fill="x", padx=40)
+        self.frame_cards.grid_columnconfigure((0, 1), weight=1)
 
-        # 4. Neta
-        color_utilidad = "#1e3d59" if datos['neta'] >= 0 else "#7a2424"
-        card_neta = ctk.CTkFrame(frame_cards, corner_radius=10, fg_color=color_utilidad)
-        card_neta.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
-        ctk.CTkLabel(card_neta, text="💰 UTILIDAD NETA", font=("Roboto", 18, "bold"), text_color="white").pack(pady=(15, 0))
-        ctk.CTkLabel(card_neta, text=f"${datos['neta']:,.2f}", font=("Roboto", 28, "bold"), text_color="white").pack(pady=(5, 15))
-        
-        btn_refresh = ctk.CTkButton(self.main_frame, text="🔄 Actualizar Datos", command=self.mostrar_reportes)
-        btn_refresh.pack(pady=10)
-
-        # --- SECCIÓN: REGISTRAR GASTO ---
+        # --- SECCIÓN 3: REGISTRAR GASTO ---
         frame_gasto = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_gasto.pack(pady=10, fill="x", padx=40)
         
         ctk.CTkLabel(frame_gasto, text="💸 Registrar Nuevo Gasto", font=("Roboto", 18, "bold")).pack(pady=5)
-        
-        self.gasto_desc = ctk.CTkEntry(frame_gasto, width=350, placeholder_text="Descripción (Ej: Pago de luz, Mantenimiento)")
+        self.gasto_desc = ctk.CTkEntry(frame_gasto, width=350, placeholder_text="Descripción (Ej: Pago de luz)")
         self.gasto_desc.pack(pady=5)
-        
-        self.gasto_monto = ctk.CTkEntry(frame_gasto, width=350, placeholder_text="Monto en dinero (Ej: 50000)")
+        self.gasto_monto = ctk.CTkEntry(frame_gasto, width=350, placeholder_text="Monto (Ej: 50000)")
         self.gasto_monto.pack(pady=5)
         
-        # AQUÍ ESTÁ EL BOTÓN QUE LLAMA A LA FUNCIÓN
         btn_gasto = ctk.CTkButton(frame_gasto, text="Registrar Salida de Dinero", fg_color="#7a2424", hover_color="#5c1a1a", command=self.guardar_gasto_gui)
         btn_gasto.pack(pady=10)
 
-    def guardar_gasto_gui(self):
-        """Captura el gasto y lo envía a la base de datos."""
+        # Llamamos a los datos la primera vez que se abre la ventana
+        self.cargar_tarjetas_reporte()
+
+    def cargar_tarjetas_reporte(self):
+        """Limpia las tarjetas viejas y dibuja las nuevas según el mes elegido."""
+        # Destruir tarjetas anteriores si existen
+        for widget in self.frame_cards.winfo_children():
+            widget.destroy()
+
         from main import Dashboard
+        periodo_seleccionado = self.combo_periodo.get()
+        exito, datos = Dashboard.generar_reporte_financiero(periodo_seleccionado)
+
+        if not exito:
+            from tkinter import messagebox
+            messagebox.showerror("Error", f"No se pudo cargar el reporte: {datos}")
+            return
+
+        # 1. Ingresos
+        card_ingresos = ctk.CTkFrame(self.frame_cards, corner_radius=10, fg_color="#1f532b")
+        card_ingresos.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        ctk.CTkLabel(card_ingresos, text="📈 Ingresos", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
+        ctk.CTkLabel(card_ingresos, text=f"${datos['ingresos']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
+
+        # 2. Gastos
+        card_gastos = ctk.CTkFrame(self.frame_cards, corner_radius=10, fg_color="#7a2424")
+        card_gastos.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+        ctk.CTkLabel(card_gastos, text="📉 Gastos", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
+        ctk.CTkLabel(card_gastos, text=f"${datos['gastos']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
+
+        # 3. Anulaciones
+        card_anulaciones = ctk.CTkFrame(self.frame_cards, corner_radius=10, fg_color="#9c6614")
+        card_anulaciones.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+        ctk.CTkLabel(card_anulaciones, text="⚠️ Anulaciones", font=("Roboto", 16), text_color="white").pack(pady=(15, 0))
+        ctk.CTkLabel(card_anulaciones, text=f"${datos['anulaciones']:,.2f}", font=("Roboto", 24, "bold"), text_color="white").pack(pady=(5, 15))
+
+        # 4. Utilidad Neta
+        color_utilidad = "#1e3d59" if datos['neta'] >= 0 else "#7a2424"
+        card_neta = ctk.CTkFrame(self.frame_cards, corner_radius=10, fg_color=color_utilidad)
+        card_neta.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
+        ctk.CTkLabel(card_neta, text="💰 UTILIDAD NETA", font=("Roboto", 18, "bold"), text_color="white").pack(pady=(15, 0))
+        ctk.CTkLabel(card_neta, text=f"${datos['neta']:,.2f}", font=("Roboto", 28, "bold"), text_color="white").pack(pady=(5, 15))
+
+    def guardar_gasto_gui(self):
+        from main import Dashboard
+        from tkinter import messagebox
         desc = self.gasto_desc.get()
         monto_str = self.gasto_monto.get()
 
@@ -421,11 +486,15 @@ class VentanaDashboard(ctk.CTk):
             
             if exito:
                 messagebox.showinfo("Gasto Registrado", mensaje)
-                self.mostrar_reportes() # Recarga la pantalla para que la gráfica baje al instante
+                self.gasto_desc.delete(0, 'end')
+                self.gasto_monto.delete(0, 'end')
+                # 🔄 Recargamos las tarjetas al instante para ver la bajada en utilidad
+                self.cargar_tarjetas_reporte() 
             else:
                 messagebox.showerror("Error", mensaje)
         except ValueError:
             messagebox.showerror("Error", "El monto debe ser un número válido.")
+    # =========================================================
         
       # =========================================================
     # --- FUNCIONES PARA GESTIÓN DE CLIENTES (FASE 3 - CRUD) ---
@@ -1119,7 +1188,188 @@ class VentanaDashboard(ctk.CTk):
                 self.cargar_tabla_inventario()
             else:
                 messagebox.showerror("Error", mensaje)
+            
     # =========================================================
+    # --- FUNCIONES PARA GESTIÓN DE PLANES (FASE 8 - CRUD) ---
+    # =========================================================
+    def mostrar_planes(self):
+        self.limpiar_main_frame()
+        
+        lbl_titulo = ctk.CTkLabel(self.main_frame, text="📋 Configuración de Planes y Precios", font=("Roboto", 24, "bold"))
+        lbl_titulo.pack(pady=(20, 10))
+
+        # --- FORMULARIO ---
+        frame_form = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        frame_form.pack(pady=10)
+
+        self.plan_id = ctk.CTkEntry(frame_form, width=80, placeholder_text="ID")
+        self.plan_id.grid(row=0, column=0, padx=5, pady=10)
+        self.plan_id.configure(state="disabled")
+
+        self.plan_nombre = ctk.CTkEntry(frame_form, width=220, placeholder_text="Nombre (Ej: Plan Verano)")
+        self.plan_nombre.grid(row=0, column=1, padx=10, pady=10)
+
+        self.plan_dias = ctk.CTkEntry(frame_form, width=150, placeholder_text="Duración (Días)")
+        self.plan_dias.grid(row=0, column=2, padx=10, pady=10)
+
+        self.plan_precio = ctk.CTkEntry(frame_form, width=150, placeholder_text="Precio Total ($)")
+        self.plan_precio.grid(row=0, column=3, padx=10, pady=10)
+
+        # --- BOTONES DE ACCIÓN (CRUD) ---
+        frame_botones = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        frame_botones.pack(pady=10)
+
+        ctk.CTkButton(frame_botones, text="➕ Crear Plan", fg_color="#28527a", width=120, command=self.registrar_plan_gui).grid(row=0, column=0, padx=5)
+        ctk.CTkButton(frame_botones, text="🔄 Actualizar Precio", fg_color="#d4a373", text_color="black", hover_color="#faedcd", width=150, command=self.actualizar_plan_gui).grid(row=0, column=1, padx=5)
+        ctk.CTkButton(frame_botones, text="🗑️ Eliminar", fg_color="#7a2424", hover_color="#5c1a1a", width=120, command=self.eliminar_plan_gui).grid(row=0, column=2, padx=5)
+        ctk.CTkButton(frame_botones, text="🧹 Limpiar", fg_color="gray", width=120, command=self.limpiar_form_plan).grid(row=0, column=3, padx=5)
+
+        # --- TABLA DE PLANES ---
+        from tkinter import ttk
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Treeview", rowheight=30)
+
+        frame_tabla = ctk.CTkFrame(self.main_frame)
+        frame_tabla.pack(pady=10, fill="both", expand=True, padx=40)
+
+        columnas = ("id", "nombre", "dias", "precio")
+        self.tabla_planes = ttk.Treeview(frame_tabla, columns=columnas, show="headings", height=6)
+        
+        self.tabla_planes.heading("id", text="ID")
+        self.tabla_planes.heading("nombre", text="Nombre del Plan")
+        self.tabla_planes.heading("dias", text="Días de Acceso")
+        self.tabla_planes.heading("precio", text="Precio de Venta")
+
+        self.tabla_planes.column("id", width=60, anchor="center")
+        self.tabla_planes.column("nombre", width=300, anchor="w")
+        self.tabla_planes.column("dias", width=150, anchor="center")
+        self.tabla_planes.column("precio", width=150, anchor="center")
+
+        scrollbar = ttk.Scrollbar(frame_tabla, orient="vertical", command=self.tabla_planes.yview)
+        self.tabla_planes.configure(yscroll=scrollbar.set)
+        
+        self.tabla_planes.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        self.tabla_planes.bind("<<TreeviewSelect>>", self.seleccionar_plan_tabla)
+        self.cargar_tabla_planes()
+
+    def cargar_tabla_planes(self):
+        from main import Plan
+        for item in self.tabla_planes.get_children():
+            self.tabla_planes.delete(item)
+            
+        exito, planes = Plan.obtener_todos()
+        if exito:
+            for p in planes:
+                self.tabla_planes.insert("", "end", values=(p[0], p[1], p[2], f"${p[3]:,.2f}"))
+
+    def seleccionar_plan_tabla(self, event):
+        seleccion = self.tabla_planes.selection()
+        if seleccion:
+            item = self.tabla_planes.item(seleccion[0])
+            datos = item['values']
+            
+            # 1. Limpiamos y dejamos el candado abierto (True)
+            self.limpiar_form_plan(desbloquear=True)
+            
+            # 2. Escribimos todos los datos (ahora sí nos dejará escribir el ID)
+            self.plan_id.insert(0, str(datos[0]))
+            self.plan_nombre.insert(0, str(datos[1]))
+            self.plan_dias.insert(0, str(datos[2]))
+            
+            # Limpiamos los símbolos de moneda por si acaso
+            precio_limpio = str(datos[3]).replace("$", "").replace(",", "")
+            self.plan_precio.insert(0, precio_limpio)
+            
+            # 3. Volvemos a cerrar el candado del ID para protegerlo
+            self.plan_id.configure(state="disabled")
+
+    def limpiar_form_plan(self, desbloquear=True):
+        if desbloquear:
+            self.plan_id.configure(state="normal")
+        self.plan_id.delete(0, 'end')
+        self.plan_nombre.delete(0, 'end')
+        self.plan_dias.delete(0, 'end')
+        self.plan_precio.delete(0, 'end')
+        
+        if not desbloquear:
+            self.plan_id.configure(state="disabled")
+
+    def registrar_plan_gui(self):
+        from main import Plan
+        from tkinter import messagebox
+        nom = self.plan_nombre.get()
+        dias_str = self.plan_dias.get()
+        pre_str = self.plan_precio.get()
+
+        if not nom or not dias_str or not pre_str:
+            messagebox.showwarning("Atención", "Llena todos los campos para crear un plan.")
+            return
+
+        try:
+            dias = int(dias_str)
+            pre = float(pre_str)
+            nuevo_plan = Plan(nombre=nom, dias_duracion=dias, precio_base=pre)
+            exito, mensaje = nuevo_plan.registrar()
+            
+            if exito:
+                messagebox.showinfo("Éxito", mensaje)
+                self.limpiar_form_plan()
+                self.cargar_tabla_planes()
+            else:
+                messagebox.showerror("Error", mensaje)
+        except ValueError:
+            messagebox.showerror("Error", "Días debe ser un número entero y Precio un número.")
+
+    def actualizar_plan_gui(self):
+        from main import Plan
+        from tkinter import messagebox
+        id_p = self.plan_id.get()
+        nom = self.plan_nombre.get()
+        dias_str = self.plan_dias.get()
+        pre_str = self.plan_precio.get()
+
+        if not id_p:
+            messagebox.showwarning("Atención", "Selecciona un plan de la tabla.")
+            return
+
+        try:
+            dias = int(dias_str)
+            pre = float(pre_str)
+            exito, mensaje = Plan.actualizar(id_p, nom, dias, pre)
+            
+            if exito:
+                messagebox.showinfo("Éxito", mensaje)
+                self.limpiar_form_plan()
+                self.cargar_tabla_planes()
+            else:
+                messagebox.showerror("Error", mensaje)
+        except ValueError:
+            messagebox.showerror("Error", "Días debe ser un número entero y Precio un número.")
+
+    def eliminar_plan_gui(self):
+        from main import Plan
+        from tkinter import messagebox
+        id_p = self.plan_id.get()
+        nom = self.plan_nombre.get()
+        
+        if not id_p:
+            messagebox.showwarning("Atención", "Selecciona un plan de la tabla.")
+            return
+
+        respuesta = messagebox.askyesno("Confirmar", f"¿Eliminar permanentemente el {nom}?")
+        if respuesta:
+            exito, mensaje = Plan.eliminar(id_p)
+            if exito:
+                messagebox.showinfo("Eliminado", mensaje)
+                self.limpiar_form_plan()
+                self.cargar_tabla_planes()
+            else:
+                messagebox.showerror("Error", mensaje)
+    # =========================================================
+   
             
     
 

@@ -123,7 +123,7 @@ class Plan:
         self.nombre = nombre
         self.dias_duracion = dias_duracion
         self.precio_base = precio_base
-        
+
     def registrar(self):
         conexion = conectar_db()
         cursor = conexion.cursor()
@@ -133,9 +133,52 @@ class Plan:
                 (self.nombre, self.dias_duracion, self.precio_base)
             )
             conexion.commit()
-            print(f"Plan '{self.nombre}' (Duracion: {self.dias_duracion} dias) creado correctamente.")
+            return True, f"Plan '{self.nombre}' creado exitosamente."
         except Exception as e:
-            print(f"Error al crear el plan: {e}")
+            return False, f"Error al registrar el plan: {e}"
+        finally:
+            conexion.close()
+
+    @staticmethod
+    def obtener_todos():
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute("SELECT id_plan, nombre, dias_duracion, precio_base FROM Plan")
+            return True, cursor.fetchall()
+        except Exception as e:
+            return False, f"Error al cargar planes: {e}"
+        finally:
+            conexion.close()
+
+    @staticmethod
+    def actualizar(id_plan, nombre, dias_duracion, precio_base):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute(
+                "UPDATE Plan SET nombre = ?, dias_duracion = ?, precio_base = ? WHERE id_plan = ?",
+                (nombre, dias_duracion, precio_base, id_plan)
+            )
+            conexion.commit()
+            return True, "Precio y datos del plan actualizados correctamente."
+        except Exception as e:
+            return False, f"Error al actualizar: {e}"
+        finally:
+            conexion.close()
+
+    @staticmethod
+    def eliminar(id_plan):
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute("DELETE FROM Plan WHERE id_plan = ?", (id_plan,))
+            conexion.commit()
+            return True, "Plan eliminado del sistema."
+        except sqlite3.IntegrityError:
+            return False, "Bloqueo: No puedes borrar este plan porque hay clientes que lo tienen activo en este momento."
+        except Exception as e:
+            return False, f"Error al eliminar: {e}"
         finally:
             conexion.close()
             
@@ -585,31 +628,44 @@ class Producto:
                   
 class Dashboard:
     @staticmethod
-    def generar_reporte_financiero():
+    def generar_reporte_financiero(periodo=None):
+        """periodo debe ser 'YYYY-MM'. Si es None, toma el mes actual. Si es 'TODO', suma todo el histórico."""
+        from datetime import datetime
         conexion = conectar_db()
         cursor = conexion.cursor()
         
-        total_ingresos = 0.0
-        total_gastos = 0.0
-        total_anulaciones = 0.0
-        utilidad_neta = 0.0
+        total_ingresos = total_gastos = total_anulaciones = 0.0
         
         try: 
-            cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Ingreso'")
-            fila_ingresos = cursor.fetchone()
-            if fila_ingresos: total_ingresos = fila_ingresos[0]
+            # 1. Armamos el filtro según lo que pidió el usuario
+            if periodo == "TODO":
+                filtro = ""
+                parametros = ()
+            else:
+                if not periodo:
+                    # Si no envían nada, agarramos el mes y año actual automáticamente
+                    periodo = datetime.now().strftime('%Y-%m')
+                
+                # Asumimos que la columna en tu BD se llama 'fecha' o 'fecha_hora'
+                # El comando LIKE busca todo lo que empiece con ese Año-Mes
+                filtro = " AND fecha LIKE ?" 
+                parametros = (f"{periodo}%",)
+
+            # 2. Hacemos las sumas aplicando el filtro
+            cursor.execute(f"SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Ingreso'{filtro}", parametros)
+            fila = cursor.fetchone()
+            if fila: total_ingresos = fila[0]
             
-            cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Gasto'")
-            fila_gastos = cursor.fetchone()
-            if fila_gastos: total_gastos = fila_gastos[0]
+            cursor.execute(f"SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Gasto'{filtro}", parametros)
+            fila = cursor.fetchone()
+            if fila: total_gastos = fila[0]
             
-            cursor.execute("SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Anulacion'")
-            fila_anulaciones = cursor.fetchone()
-            if fila_anulaciones: total_anulaciones = fila_anulaciones[0]
+            cursor.execute(f"SELECT COALESCE(SUM(monto), 0) FROM Transaccion WHERE tipo = 'Anulacion'{filtro}", parametros)
+            fila = cursor.fetchone()
+            if fila: total_anulaciones = fila[0]
             
             utilidad_neta = total_ingresos + total_gastos + total_anulaciones
             
-            # En lugar de imprimir, devolvemos un diccionario con los números limpios
             datos = {
                 "ingresos": total_ingresos,
                 "gastos": total_gastos,
@@ -619,8 +675,8 @@ class Dashboard:
             return True, datos
             
         except Exception as e:
-            return False, f"Error al generar el reporte: {e}"
-            
+            # Si da error por el nombre de la columna, el usuario sabrá qué ajustar
+            return False, f"Error BD: Verifica que la columna de fecha se llame 'fecha' (Detalle: {e})"
         finally:
             conexion.close()
     
@@ -639,5 +695,52 @@ class Dashboard:
             return True, f"Gasto registrado exitosamente: ${abs(monto):,.2f}"
         except Exception as e:
             return False, f"Error al registrar el gasto: {e}"
+        finally:
+            conexion.close()
+            
+class Configuracion:
+    @staticmethod
+    def inicializar():
+        """Crea la tabla de configuración si no existe y pone valores por defecto."""
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Configuracion (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                nombre_gym TEXT,
+                ruta_logo TEXT
+            )
+        ''')
+        # Si la tabla está vacía, insertamos la fila por defecto
+        cursor.execute("INSERT OR IGNORE INTO Configuracion (id, nombre_gym, ruta_logo) VALUES (1, 'Gym Pro', '')")
+        conexion.commit()
+        conexion.close()
+
+    @staticmethod
+    def cargar():
+        """Trae el nombre y la ruta del logo guardados."""
+        Configuracion.inicializar()
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        cursor.execute("SELECT nombre_gym, ruta_logo FROM Configuracion WHERE id = 1")
+        resultado = cursor.fetchone()
+        conexion.close()
+        return resultado if resultado else ("Gym Pro", "")
+
+    @staticmethod
+    def guardar(nombre_gym, ruta_logo):
+        """Actualiza la configuración permanentemente."""
+        Configuracion.inicializar()
+        conexion = conectar_db()
+        cursor = conexion.cursor()
+        try:
+            cursor.execute(
+                "UPDATE Configuracion SET nombre_gym = ?, ruta_logo = ? WHERE id = 1",
+                (nombre_gym, ruta_logo)
+            )
+            conexion.commit()
+            return True, "Configuración guardada permanentemente."
+        except Exception as e:
+            return False, f"Error al guardar en BD: {e}"
         finally:
             conexion.close()
