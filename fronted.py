@@ -847,13 +847,27 @@ class VentanaDashboard(ctk.CTk):
         self.entry_doc_membresia = ctk.CTkEntry(frame_form, width=220, placeholder_text="Documento del Cliente")
         self.entry_doc_membresia.grid(row=0, column=1, padx=10, pady=10)
 
-        self.combo_plan = ctk.CTkComboBox(frame_form, width=250, values=[
-            "Plan Mensual (30 días)", 
-            "Plan Trimestral (90 días)", 
-            "Plan Anual (365 días)"
-        ])
+        # CARGAMOS LOS PLANES DINÁMICAMENTE DESDE LA BASE DE DATOS 
+        from main import Plan
+        exito, planes = Plan.obtener_todos()
+        lista_nombres_planes = []
+        self.diccionario_planes = {} # Guardamos los detalles ocultos para usarlos al vender
+
+        if exito and planes:
+            for p in planes:
+                # p = (id_plan, nombre, dias_duracion, precio_base)
+                texto_combo = f"{p[1]} ({p[2]} días) - ${p[3]:,.2f}"
+                lista_nombres_planes.append(texto_combo)
+                # Guardamos la info usando el texto como llave
+                self.diccionario_planes[texto_combo] = {"id": p[0], "nombre": p[1], "dias": p[2], "precio": p[3]}
+        else:
+            lista_nombres_planes = ["No hay planes creados aún"]
+
+        self.combo_plan = ctk.CTkComboBox(frame_form, width=250, values=lista_nombres_planes)
         self.combo_plan.grid(row=0, column=2, padx=10, pady=10)
-        self.combo_plan.set("Plan Mensual (30 días)")
+        
+        if lista_nombres_planes:
+            self.combo_plan.set(lista_nombres_planes[0])
 
         frame_botones = ctk.CTkFrame(self.main_frame, fg_color="transparent")
         frame_botones.pack(pady=10)
@@ -916,9 +930,14 @@ class VentanaDashboard(ctk.CTk):
             
             self.entry_id_mem.insert(0, str(datos[0]))
             self.entry_doc_membresia.insert(0, str(datos[1]))
-            if "Mensual" in str(datos[3]): self.combo_plan.set("Plan Mensual (30 días)")
-            elif "Trimestral" in str(datos[3]): self.combo_plan.set("Plan Trimestral (90 días)")
-            elif "Anual" in str(datos[3]): self.combo_plan.set("Plan Anual (365 días)")
+            
+            # Buscamos qué texto del combobox coincide con el nombre del plan en la tabla
+            nombre_plan_tabla = str(datos[3])
+            if hasattr(self, 'diccionario_planes'):
+                for texto_combo, info_plan in self.diccionario_planes.items():
+                    if info_plan["nombre"] == nombre_plan_tabla:
+                        self.combo_plan.set(texto_combo)
+                        break
             
             self.entry_id_mem.configure(state="disabled")
             self.entry_doc_membresia.configure(state="disabled")
@@ -929,18 +948,27 @@ class VentanaDashboard(ctk.CTk):
         
         self.entry_id_mem.delete(0, 'end')
         self.entry_doc_membresia.delete(0, 'end')
-        self.combo_plan.set("Plan Mensual (30 días)")
         
+        if hasattr(self, 'diccionario_planes') and self.diccionario_planes:
+            self.combo_plan.set(list(self.diccionario_planes.keys())[0])
+        else:
+            self.combo_plan.set("")
+            
         if not desbloquear:
             self.entry_id_mem.configure(state="disabled")
 
     def asignar_membresia_gui(self):
-        from main import Cliente, Membresia
+        from main import Cliente, Membresia, Transaccion
         doc = self.entry_doc_membresia.get()
         plan_seleccionado = self.combo_plan.get()
 
         if not doc:
             messagebox.showwarning("Atención", "Ingresa el documento del cliente.")
+            return
+
+        # Verificamos que sea un plan válido de la base de datos
+        if not hasattr(self, 'diccionario_planes') or plan_seleccionado not in self.diccionario_planes:
+            messagebox.showerror("Error", "Debes crear un plan válido en 'Gestión de Planes' primero.")
             return
 
         cliente = Cliente.buscar_por_documento(doc)
@@ -949,11 +977,22 @@ class VentanaDashboard(ctk.CTk):
             return
 
         id_cliente = cliente[0]
-        dias, id_plan = (30, 1) if "Mensual" in plan_seleccionado else (90, 2) if "Trimestral" in plan_seleccionado else (365, 3)
+        
+        # Extraemos los datos exactos del diccionario que creamos al cargar
+        datos_plan = self.diccionario_planes[plan_seleccionado]
+        id_plan = datos_plan["id"]
+        dias = datos_plan["dias"]
+        precio = datos_plan["precio"]
+        nombre_plan = datos_plan["nombre"]
 
         exito, mensaje = Membresia.crear_nueva(id_cliente, id_plan, dias)
         if exito:
-            messagebox.showinfo("Éxito", mensaje)
+            # REGISTRAMOS EL DINERO EN LA CAJA
+            desc_ingreso = f"Venta de Plan: {nombre_plan} (Doc: {doc})"
+            nueva_transaccion = Transaccion(id_usuario=self.id_usuario, tipo="Ingreso", monto=precio, descripcion=desc_ingreso)
+            nueva_transaccion.registrar()
+            
+            messagebox.showinfo("Éxito", f"{mensaje}\n\nIngreso de ${precio:,.2f} sumado a los reportes financieros.")
             self.limpiar_form_membresia()
             self.cargar_tabla_membresias()
         else:
@@ -968,7 +1007,12 @@ class VentanaDashboard(ctk.CTk):
             messagebox.showwarning("Atención", "Selecciona una membresía de la tabla para actualizarla.")
             return
 
-        dias, id_plan = (30, 1) if "Mensual" in plan_seleccionado else (90, 2) if "Trimestral" in plan_seleccionado else (365, 3)
+        if plan_seleccionado not in self.diccionario_planes:
+            return
+            
+        datos_plan = self.diccionario_planes[plan_seleccionado]
+        id_plan = datos_plan["id"]
+        dias = datos_plan["dias"]
 
         exito, mensaje = Membresia.actualizar(id_mem, id_plan, dias)
         if exito:
