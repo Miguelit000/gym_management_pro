@@ -78,15 +78,15 @@ Contraseña: admin123
 
 ## 📸 Capturas de Pantalla
 
-> (imagenes/1.png)
-> (imagenes/2.png)
-> (imagenes/3.png)
-> (imagenes/4.png)
-> (imagenes/5.png)
-> (imagenes/6.png)
-> (imagenes/7.png)
-> (imagenes/8.png)
-> (imagenes/9.png)
+> ![Panel Principal](imagenes/1.png)
+> ![Punta de venta](imagenes/2.png)
+> ![Gestion de clientes](imagenes/3.png)
+> ![Gestion de membresias](imagenes/4.png)
+> ![Gestión de inventario](imagenes/5.png)
+> ![Reporte financiero](imagenes/6.png)
+> ![Gestión de usuarios](imagenes/7.png)
+> ![Gestion de planes](imagenes/8.png)
+> ![Configuracion](imagenes/9.png)
 
 
 ## 👨‍💻 Autor
